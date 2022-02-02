@@ -8,6 +8,7 @@
 
 import numpy as np
 from pydrake.all import *
+from ddp import DifferentialDynamicProgramming
 import time
 
 ####################################
@@ -19,6 +20,9 @@ dt = 1e-2      # simulation timestep
 
 # Initial state
 x0 = np.array([0,0,0,0])
+
+# Target state
+x_nom = np.array([np.pi,0,0,0])
 
 ####################################
 # Create system diagram
@@ -55,48 +59,75 @@ Parser(plant_).AddModelFromFile(urdf)
 plant_.Finalize()
 context_ = plant_.CreateDefaultContext()
 
-# Set up the solver object
-trajopt = DirectTranscription(
-        plant_, context_, 
-        input_port_index=plant.get_actuation_input_port().get_index(),
-        num_time_samples=int(T/dt))
+#-----------------------------------------
+# DDP method
+#-----------------------------------------
 
-# Add constraints
-x = trajopt.state()
-u = trajopt.input()
-x_init = trajopt.initial_state()
+num_steps = int(T/dt)
+trajopt = DifferentialDynamicProgramming(plant_,num_steps)
 
-trajopt.prog().AddConstraint(eq( x_init, x0 ))
-x_err = x - np.array([np.pi, 0, 0, 0])
-trajopt.AddRunningCost(0.01*x_err.T@x_err + 0.01*u.T@u)
-trajopt.AddFinalCost(200*x_err.T@x_err)
+# Define initial and target states
+trajopt.SetInitialState(x0)
+trajopt.SetTargetState(x_nom)
 
-# Solve the optimization problem
-st = time.time()
-res = Solve(trajopt.prog())
-solve_time = time.time() - st
-assert res.is_success(), "trajectory optimizer failed"
-solver_name = res.get_solver_id().name()
-print(f"Solved in {solve_time} seconds using {solver_name}")
+# Define cost function
+Q = 0.01*np.eye(4)
+R = 0.01*np.eye(1)
+trajopt.SetRunningCost(Q, R)
+Qf = 200*np.eye(4)
+trajopt.SetTerminalCost(Qf)
 
-# Extract the solution
-timesteps = trajopt.GetSampleTimes(res)
-states = trajopt.GetStateSamples(res)
-inputs = trajopt.GetInputSamples(res)
+# Set initial guess
+u_guess = np.zeros((1,num_steps-1))
+trajopt.SetInitialGuess(u_guess)
+
+
+#-----------------------------------------
+# Direct Transcription method
+#-----------------------------------------
+#
+## Set up the solver object
+#trajopt = DirectTranscription(
+#        plant_, context_, 
+#        input_port_index=plant.get_actuation_input_port().get_index(),
+#        num_time_samples=int(T/dt))
+#
+## Add constraints
+#x = trajopt.state()
+#u = trajopt.input()
+#x_init = trajopt.initial_state()
+#
+#trajopt.prog().AddConstraint(eq( x_init, x0 ))
+#x_err = x - x_nom
+#trajopt.AddRunningCost(0.01*x_err.T@x_err + 0.01*u.T@u)
+#trajopt.AddFinalCost(200*x_err.T@x_err)
+#
+## Solve the optimization problem
+#st = time.time()
+#res = Solve(trajopt.prog())
+#solve_time = time.time() - st
+#assert res.is_success(), "trajectory optimizer failed"
+#solver_name = res.get_solver_id().name()
+#print(f"Solved in {solve_time} seconds using {solver_name}")
+#
+## Extract the solution
+#timesteps = trajopt.GetSampleTimes(res)
+#states = trajopt.GetStateSamples(res)
+#inputs = trajopt.GetInputSamples(res)
 
 #####################################
 # Playback
 #####################################
 
-while True:
-    # Just keep playing back the trajectory
-    for i in range(len(timesteps)):
-        t = timesteps[i]
-        x = states[:,i]
-
-        diagram_context.SetTime(t)
-        plant.SetPositionsAndVelocities(plant_context, x)
-        diagram.Publish(diagram_context)
-
-        time.sleep(dt-3e-4)
-    time.sleep(1)
+#while True:
+#    # Just keep playing back the trajectory
+#    for i in range(len(timesteps)):
+#        t = timesteps[i]
+#        x = states[:,i]
+#
+#        diagram_context.SetTime(t)
+#        plant.SetPositionsAndVelocities(plant_context, x)
+#        diagram.Publish(diagram_context)
+#
+#        time.sleep(dt-3e-4)
+#    time.sleep(1)
