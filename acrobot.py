@@ -57,30 +57,30 @@ plant_context = diagram.GetMutableSubsystemContext(
 plant_ = MultibodyPlant(dt)
 Parser(plant_).AddModelFromFile(urdf)
 plant_.Finalize()
-context_ = plant_.CreateDefaultContext()
 
 #-----------------------------------------
 # DDP method
 #-----------------------------------------
 
 num_steps = int(T/dt)
-trajopt = DifferentialDynamicProgramming(plant_,num_steps)
+ddp = DifferentialDynamicProgramming(plant_,num_steps)
 
 # Define initial and target states
-trajopt.SetInitialState(x0)
-trajopt.SetTargetState(x_nom)
+ddp.SetInitialState(x0)
+ddp.SetTargetState(x_nom)
 
 # Define cost function
 Q = 0.01*np.eye(4)
 R = 0.01*np.eye(1)
-trajopt.SetRunningCost(Q, R)
+ddp.SetRunningCost(Q, R)
 Qf = 200*np.eye(4)
-trajopt.SetTerminalCost(Qf)
+ddp.SetTerminalCost(Qf)
 
 # Set initial guess
 u_guess = np.zeros((1,num_steps-1))
-trajopt.SetInitialGuess(u_guess)
+ddp.SetInitialGuess(u_guess)
 
+ddp.Solve()
 
 #-----------------------------------------
 # Direct Transcription method
