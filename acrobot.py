@@ -15,8 +15,12 @@ import time
 # Parameters
 ####################################
 
-T = 1.5          # total simulation time (S)
+T = 2.0          # total simulation time (S)
 dt = 1e-2      # simulation timestep
+
+# Solver method
+# must be "ilqr" or "sqp"
+method = "ilqr"
 
 # Initial state
 x0 = np.array([0,0,0,0])
@@ -57,64 +61,70 @@ plant_context = diagram.GetMutableSubsystemContext(
 plant_ = MultibodyPlant(dt)
 Parser(plant_).AddModelFromFile(urdf)
 plant_.Finalize()
+context_ = plant_.CreateDefaultContext()
 
 #-----------------------------------------
 # DDP method
 #-----------------------------------------
 
-num_steps = int(T/dt)
-ilqr = IterativeLinearQuadraticRegulator(plant_,num_steps)
+if method == "ilqr":
+    num_steps = int(T/dt)
+    ilqr = IterativeLinearQuadraticRegulator(plant_,num_steps, eps=0.5)
 
-# Define initial and target states
-ilqr.SetInitialState(x0)
-ilqr.SetTargetState(x_nom)
+    # Define initial and target states
+    ilqr.SetInitialState(x0)
+    ilqr.SetTargetState(x_nom)
 
-# Define cost function
-Q = 0.01*np.eye(4)
-R = 0.01*np.eye(1)
-ilqr.SetRunningCost(Q, R)
-Qf = 200*np.eye(4)
-ilqr.SetTerminalCost(Qf)
+    # Define cost function
+    Q = 0.01*np.eye(4)
+    R = 0.01*np.eye(1)
+    ilqr.SetRunningCost(Q, R)
+    Qf = 200*np.eye(4)
+    ilqr.SetTerminalCost(Qf)
 
-# Set initial guess
-u_guess = np.zeros((1,num_steps-1))
-ilqr.SetInitialGuess(u_guess)
+    # Set initial guess
+    u_guess = np.zeros((1,num_steps-1))
+    ilqr.SetInitialGuess(u_guess)
 
-states, inputs = ilqr.Solve()
-timesteps = np.linspace(0,dt,num_steps)
+    states, inputs = ilqr.Solve()
+    timesteps = np.arange(0.0,T,dt)
 
 #-----------------------------------------
 # Direct Transcription method
 #-----------------------------------------
-#
-## Set up the solver object
-#trajopt = DirectTranscription(
-#        plant_, context_, 
-#        input_port_index=plant.get_actuation_input_port().get_index(),
-#        num_time_samples=int(T/dt))
-#
-## Add constraints
-#x = trajopt.state()
-#u = trajopt.input()
-#x_init = trajopt.initial_state()
-#
-#trajopt.prog().AddConstraint(eq( x_init, x0 ))
-#x_err = x - x_nom
-#trajopt.AddRunningCost(0.01*x_err.T@x_err + 0.01*u.T@u)
-#trajopt.AddFinalCost(200*x_err.T@x_err)
-#
-## Solve the optimization problem
-#st = time.time()
-#res = Solve(trajopt.prog())
-#solve_time = time.time() - st
-#assert res.is_success(), "trajectory optimizer failed"
-#solver_name = res.get_solver_id().name()
-#print(f"Solved in {solve_time} seconds using {solver_name}")
-#
-## Extract the solution
-#timesteps = trajopt.GetSampleTimes(res)
-#states = trajopt.GetStateSamples(res)
-#inputs = trajopt.GetInputSamples(res)
+
+elif method == "sqp":
+    # Set up the solver object
+    trajopt = DirectTranscription(
+            plant_, context_, 
+            input_port_index=plant.get_actuation_input_port().get_index(),
+            num_time_samples=int(T/dt))
+    
+    # Add constraints
+    x = trajopt.state()
+    u = trajopt.input()
+    x_init = trajopt.initial_state()
+    
+    trajopt.prog().AddConstraint(eq( x_init, x0 ))
+    x_err = x - x_nom
+    trajopt.AddRunningCost(0.01*x_err.T@x_err + 0.01*u.T@u)
+    trajopt.AddFinalCost(200*x_err.T@x_err)
+    
+    # Solve the optimization problem
+    st = time.time()
+    res = Solve(trajopt.prog())
+    solve_time = time.time() - st
+    assert res.is_success(), "trajectory optimizer failed"
+    solver_name = res.get_solver_id().name()
+    print(f"Solved in {solve_time} seconds using {solver_name}")
+    
+    # Extract the solution
+    timesteps = trajopt.GetSampleTimes(res)
+    states = trajopt.GetStateSamples(res)
+    inputs = trajopt.GetInputSamples(res)
+
+else:
+    raise ValueError("Unknown method %s"%method)
 
 #####################################
 # Playback

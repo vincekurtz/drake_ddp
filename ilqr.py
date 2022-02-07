@@ -16,7 +16,7 @@ class IterativeLinearQuadraticRegulator():
 
     using iLQR.
     """
-    def __init__(self, plant, num_timesteps, eps=0.5):
+    def __init__(self, plant, num_timesteps, eps=1.0):
         """
         Args:
             plant:          Drake MultibodyPlant describing the discrete-time dynamics
@@ -207,19 +207,67 @@ class IterativeLinearQuadraticRegulator():
 
         return (ExtractValue(x_next).flatten(), fx, fu)
 
-    def _forward_pass(self):
+    def _forward_pass(self, L_last):
         """
         Simulate the system forward in time using the local feedback
         control law
 
             u = u_bar - eps*kappa - K*(x-x_bar).
 
+        Performs a linesearch on eps to (approximately) determine the 
+        largest value in (0,1] that results in a reduced cost. 
+
+        Args:
+            L_last: Total loss from last iteration, used for linesearch
+
         Updates:
             u_bar:  The current best-guess of optimal u
             x_bar:  The current best-guess of optimal x
             fx:     Dynamics gradient w.r.t. x
             fu:     Dynamics gradient w.r.t. u
+
+        Returns:
+            L:      Total cost associated with this iteration
+            eps:    Linesearch parameter used
         """
+        gamma = 0.5  # linsearch termination parameter
+        beta = 0.95   # linesearch reduction parameter (updates eps = beta*eps)
+
+        eps = 1.0
+        L, x, u, fx, fu = self._forward_pass_helper(eps)
+        while L >= L_last:
+            # Reduce eps until we get an improvement in the total cost
+            eps *= beta
+            L, x, u, fx, fu = self._forward_pass_helper(eps)
+
+        # Update stored values
+        self.u_bar = u
+        self.x_bar = x
+        self.fx = fx
+        self.fu = fu
+
+        return L, eps
+    
+    def _forward_pass_helper(self, eps):
+        """
+        Simulate the system forward in time using the local feedback
+        control law
+
+            u = u_bar - eps*kappa - K*(x-x_bar)
+
+        for the given linesearch parameter. 
+
+        Args:
+            eps:    Linesearch parameter in (0,1]
+
+        Return:
+            L:  Total cost associated with this rollout
+            x:  State trajectory associated with this rollout
+            u:  Control sequence associated with this rollout
+            fx: Dynamics gradient w.r.t x for this rollout
+            fu: Dynamics gradient w.r.t u  for this rollout
+        """
+        L = 0
         x = np.zeros((self.n,self.N))
         u = np.zeros((self.m,self.N-1))
         fx = np.zeros((self.n,self.n,self.N-1))
@@ -230,16 +278,14 @@ class IterativeLinearQuadraticRegulator():
 
         # simulate forward
         for t in range(0,self.N-1):
-            u[:,t] = self.u_bar[:,t] - self.eps*self.kappa[:,t] - self.K[:,:,t]@(x[:,t] - self.x_bar[:,t])
+            u[:,t] = self.u_bar[:,t] - eps*self.kappa[:,t] - self.K[:,:,t]@(x[:,t] - self.x_bar[:,t])
             x[:,t+1], fx[:,:,t], fu[:,:,t] = self._calc_dynamics(x[:,t], u[:,t])
 
-        # TODO: line search
+            L += (x[:,t]-self.x_nom).T@self.Q@(x[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
 
-        # Update stored values
-        self.u_bar = u
-        self.x_bar = x
-        self.fx = fx
-        self.fu = fu
+        L += (x[:,-1]-self.x_nom).T@self.Qf@(x[:,-1]-self.x_nom)
+
+        return (L, x, u, fx, fu)
 
     def _backward_pass(self):
         """
@@ -292,20 +338,35 @@ class IterativeLinearQuadraticRegulator():
             x:  (n,N) numpy array containing optimal state trajectory
             u:  (m,N-1) numpy array containing optimal control tape
         """
-        for i in range(20):
-            print("Interation: ", i+1)
-            self._forward_pass()
-            
-            # DEBUG: compute total cost from nominal trajectory
-            L = 0
-            for t in range(self.N-1):
-                x = self.x_bar[:,t]
-                u = self.u_bar[:,t]
-                L += (x-self.x_nom).T@self.Q@(x-self.x_nom) + u.T@self.R@u
-            x = self.x_bar[:,-1]
-            L += (x.T-self.x_nom.T)@self.Qf@(x-self.x_nom)
-            print("Cost: ", L)
+        # Termination criterion: stop when loss improves by less than
+        # this amount
+        delta = 1e-2  
+       
+        # Store total cost and improvement in cost
+        L = np.inf
+        improvement = np.inf
 
+        # Print labels for debug info
+        print("----------------------------------------------------------------------")
+        print("|    iter    |    cost    |    eps    |    iter time    |    time    |")
+        print("----------------------------------------------------------------------")
+
+        # iteration counter
+        i = 1
+        st = time.time()
+        while improvement > delta:
+            st_iter = time.time()
+
+            L_new, eps = self._forward_pass(L)
             self._backward_pass()
+
+            iter_time = time.time() - st_iter
+            total_time = time.time() - st
+
+            print(f"{i:^14}{L_new:11.4f}  {eps:^12.4f}     {iter_time:1.5f}          {total_time:4.2f}")
+
+            improvement = L - L_new
+            L = L_new
+            i += 1
 
         return self.x_bar, self.u_bar
