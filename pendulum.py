@@ -111,8 +111,8 @@ elif method == "sqp":
     
     trajopt.prog().AddConstraint(eq( x_init, x0 ))
     x_err = x - x_nom
-    trajopt.AddRunningCost(x_err.T@Q@x_err + u.T@R@u)
-    trajopt.AddFinalCost(x_err.T@Qf@x_err)
+    trajopt.AddRunningCost(x_err.T@Q/dt@x_err + u.T@R/dt@u)  # scale by dt since this running
+    trajopt.AddFinalCost(x_err.T@Qf@x_err)                   # cost is defined as an integral
     
     # Solve the optimization problem
     st = time.time()
