@@ -69,7 +69,7 @@ context_ = plant_.CreateDefaultContext()
 
 if method == "ilqr":
     num_steps = int(T/dt)
-    ilqr = IterativeLinearQuadraticRegulator(plant_,num_steps, eps=0.5)
+    ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)

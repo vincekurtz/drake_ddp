@@ -16,13 +16,18 @@ class IterativeLinearQuadraticRegulator():
 
     using iLQR.
     """
-    def __init__(self, plant, num_timesteps, eps=1.0):
+    def __init__(self, plant, num_timesteps, delta=1e-2, beta=0.95, gamma=0.0):
         """
         Args:
             plant:          Drake MultibodyPlant describing the discrete-time dynamics
                              x_{t+1} = f(x_t,u_t)
             num_timesteps:  Number of timesteps to consider in the optimization
-            eps:            Line search parameter in (0,1)
+            delta:          Termination criterion - the algorithm ends when the improvement
+                             in the total cost is less than delta. 
+            beta:           Linesearch parameter in (0,1). Higher values lead to smaller
+                             linesearch steps. 
+            gamma:          Linesearch parameter in [0,1). Higher values mean linesearch
+                             is performed more often in hopes of larger cost reductions.
         """
         assert plant.IsDifferenceEquationSystem()[0],  "must be a discrete-time system"
 
@@ -33,7 +38,9 @@ class IterativeLinearQuadraticRegulator():
         self.m = self.plant.num_actuators()
         
         self.N = num_timesteps
-        self.eps = eps
+        self.delta = delta
+        self.beta = beta
+        self.gamma = gamma
 
         # Initial and target states
         self.x0 = None
@@ -55,6 +62,10 @@ class IterativeLinearQuadraticRegulator():
         # Local feedback gains u = u_bar - eps*kappa_t - K_t*(x-x_bar)
         self.kappa = np.zeros((self.m,self.N-1))
         self.K = np.zeros((self.m,self.n,self.N-1))
+
+        # Coefficents Qu'*Quu^{-1}*Qu for computing the expected 
+        # reduction in cost dV = sum_t eps*(1-eps/2)*Qu'*Quu^{-1}*Qu
+        self.dV_coeff = np.zeros(self.N-1)
 
     def SetInitialState(self, x0):
         """
@@ -230,15 +241,12 @@ class IterativeLinearQuadraticRegulator():
             L:      Total cost associated with this iteration
             eps:    Linesearch parameter used
         """
-        gamma = 0.5  # linsearch termination parameter
-        beta = 0.95   # linesearch reduction parameter (updates eps = beta*eps)
-
         eps = 1.0
-        L, x, u, fx, fu = self._forward_pass_helper(eps)
-        while L >= L_last:
+        L, dV, x, u, fx, fu = self._forward_pass_helper(eps)
+        while L >= L_last + self.gamma*dV:
             # Reduce eps until we get an improvement in the total cost
-            eps *= beta
-            L, x, u, fx, fu = self._forward_pass_helper(eps)
+            eps *= self.beta
+            L, dV, x, u, fx, fu = self._forward_pass_helper(eps)
 
         # Update stored values
         self.u_bar = u
@@ -255,19 +263,21 @@ class IterativeLinearQuadraticRegulator():
 
             u = u_bar - eps*kappa - K*(x-x_bar)
 
-        for the given linesearch parameter. 
+        for the given linesearch parameter eps.
 
         Args:
             eps:    Linesearch parameter in (0,1]
 
         Return:
             L:  Total cost associated with this rollout
+            dV: Expected change in total cost
             x:  State trajectory associated with this rollout
             u:  Control sequence associated with this rollout
             fx: Dynamics gradient w.r.t x for this rollout
             fu: Dynamics gradient w.r.t u  for this rollout
         """
         L = 0
+        dV = 0
         x = np.zeros((self.n,self.N))
         u = np.zeros((self.m,self.N-1))
         fx = np.zeros((self.n,self.n,self.N-1))
@@ -282,10 +292,11 @@ class IterativeLinearQuadraticRegulator():
             x[:,t+1], fx[:,:,t], fu[:,:,t] = self._calc_dynamics(x[:,t], u[:,t])
 
             L += (x[:,t]-self.x_nom).T@self.Q@(x[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
+            dV += -eps*(1-eps/2)*self.dV_coeff[t]
 
         L += (x[:,-1]-self.x_nom).T@self.Qf@(x[:,-1]-self.x_nom)
 
-        return (L, x, u, fx, fu)
+        return (L, dV, x, u, fx, fu)
 
     def _backward_pass(self):
         """
@@ -297,8 +308,9 @@ class IterativeLinearQuadraticRegulator():
             u = u_bar - eps*kappa - K*(x-x_bar).
 
         Updates:
-            kappa:  feedforward control term at each timestep
-            K:      feedback control term at each timestep
+            kappa:      feedforward control term at each timestep
+            K:          feedback control term at each timestep
+            dV_coeff:   coefficients for expected change in cost
         """
         # Store gradient and hessian of cost-to-go
         Vx, Vxx = self._terminal_cost_partials(self.x_bar[:,-1])
@@ -325,6 +337,9 @@ class IterativeLinearQuadraticRegulator():
             self.kappa[:,t] = Quu_inv@Qu
             self.K[:,:,t] = Quu_inv@Qux
 
+            # Derive cost reduction parameters
+            self.dV_coeff[t] = Qu.T@Quu_inv@Qu
+
             # Update gradient and hessian of cost-to-go
             Vx = Qx - Qu.T@Quu_inv@Qux
             Vxx = Qxx - Qux.T@Quu_inv@Qux
@@ -338,10 +353,6 @@ class IterativeLinearQuadraticRegulator():
             x:  (n,N) numpy array containing optimal state trajectory
             u:  (m,N-1) numpy array containing optimal control tape
         """
-        # Termination criterion: stop when loss improves by less than
-        # this amount
-        delta = 1e-2  
-       
         # Store total cost and improvement in cost
         L = np.inf
         improvement = np.inf
@@ -354,7 +365,7 @@ class IterativeLinearQuadraticRegulator():
         # iteration counter
         i = 1
         st = time.time()
-        while improvement > delta:
+        while improvement > self.delta:
             st_iter = time.time()
 
             L_new, eps = self._forward_pass(L)
