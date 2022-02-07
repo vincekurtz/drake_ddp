@@ -207,7 +207,7 @@ class IterativeLinearQuadraticRegulator():
         self.plant.get_actuation_input_port().FixValue(self.context, u_ad)
 
         # Compute the forward dynamics x_next = f(x,u)
-        state = self.plant.AllocateDiscreteVariables()
+        state = self.context.get_discrete_state()
         self.plant.CalcDiscreteVariableUpdates(self.context, state)
         x_next = state.get_vector().CopyToVector()
        
