@@ -1,19 +1,19 @@
 ##
 #
-# A simple implementation of Differential Dynamic Programming (DDP)
+# A simple implementation of iterative LQR (iLQR) for Drake MultibodyPlants.
 #
 ##
 
 from pydrake.all import *
 
-class DifferentialDynamicProgramming():
+class IterativeLinearQuadraticRegulator():
     """
     Set up and solve a trajectory optimization problem of the form
 
         min_{u} sum{ (x-x_nom)'Q(x-x_nom) + u'Ru } + (x-x_nom)'Qf(x-x_nom)
         s.t.    x_{t+1} = f(x_t, u_t)
 
-    using DDP.
+    using iLQR.
     """
     def __init__(self, plant, num_timesteps, eps=0.5):
         """
@@ -34,16 +34,31 @@ class DifferentialDynamicProgramming():
         self.N = num_timesteps
         self.eps = eps
 
-        # Define default cost
-        self.l = lambda x, u : 0
-        self.lf = lambda xf : 0
+        # Initial and target states
+        self.x0 = None
+        self.x_xom = None
+
+        # Quadratic cost terms
+        self.Q = None
+        self.R = None
+        self.Qf = None
 
         # Arrays to store best guess of control and state trajectory
         self.x_bar = np.zeros((self.n,self.N))
         self.u_bar = np.zeros((self.m,self.N-1))
 
-        # List of approximate cost-to-go
-        self.V = []
+        # Arrays to store dynamics gradients
+        self.fx = None
+        self.fu = None
+
+        # Local feedback gains u = u_bar - eps*kappa_t - K_t*(x-x_bar)
+        self.kappa = np.zeros((self.m,self.N-1))
+        self.K = np.zeros((self.m,self.n,self.N-1))
+
+        # Gradient and hessian of cost-to-go at next timestep
+        # (used in backward pass)
+        self.Vx = None
+        self.Vxx = None
 
     def SetInitialState(self, x0):
         """
@@ -52,7 +67,7 @@ class DifferentialDynamicProgramming():
         Args:
             x0: Vector containing the initial state of the system
         """
-        self.plant.SetPositionsAndVelocities(self.context, x0)
+        self.x0 = x0
 
     def SetTargetState(self, x_nom):
         """
@@ -99,7 +114,7 @@ class DifferentialDynamicProgramming():
             u_guess:    (m,N-1) numpy array containing u at each timestep
         """
         assert u_guess.shape == (self.m, self.N-1)
-        self.U = u_guess
+        self.u_bar = u_guess
 
     def SetControlLimits(self, u_min, u_max):
         pass
@@ -151,7 +166,11 @@ class DifferentialDynamicProgramming():
 
     def _forward_pass(self):
         """
-        Simulate the system forward in time using the current
+        Simulate the system forward in time using the local feedback
+        control law
+
+            u = u_bar - eps*kappa - K*(x-x_bar).
+
         """
         pass
 

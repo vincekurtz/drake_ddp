@@ -8,7 +8,7 @@
 
 import numpy as np
 from pydrake.all import *
-from ddp import DifferentialDynamicProgramming
+from ilqr import IterativeLinearQuadraticRegulator
 import time
 
 ####################################
@@ -63,24 +63,24 @@ plant_.Finalize()
 #-----------------------------------------
 
 num_steps = int(T/dt)
-ddp = DifferentialDynamicProgramming(plant_,num_steps)
+ilqr = IterativeLinearQuadraticRegulator(plant_,num_steps)
 
 # Define initial and target states
-ddp.SetInitialState(x0)
-ddp.SetTargetState(x_nom)
+ilqr.SetInitialState(x0)
+ilqr.SetTargetState(x_nom)
 
 # Define cost function
 Q = 0.01*np.eye(4)
 R = 0.01*np.eye(1)
-ddp.SetRunningCost(Q, R)
+ilqr.SetRunningCost(Q, R)
 Qf = 200*np.eye(4)
-ddp.SetTerminalCost(Qf)
+ilqr.SetTerminalCost(Qf)
 
 # Set initial guess
 u_guess = np.zeros((1,num_steps-1))
-ddp.SetInitialGuess(u_guess)
+ilqr.SetInitialGuess(u_guess)
 
-ddp.Solve()
+ilqr.Solve()
 
 #-----------------------------------------
 # Direct Transcription method
