@@ -80,7 +80,8 @@ ilqr.SetTerminalCost(Qf)
 u_guess = np.zeros((1,num_steps-1))
 ilqr.SetInitialGuess(u_guess)
 
-ilqr.Solve()
+states, inputs = ilqr.Solve()
+timesteps = np.linspace(0,dt,num_steps)
 
 #-----------------------------------------
 # Direct Transcription method
@@ -119,15 +120,15 @@ ilqr.Solve()
 # Playback
 #####################################
 
-#while True:
-#    # Just keep playing back the trajectory
-#    for i in range(len(timesteps)):
-#        t = timesteps[i]
-#        x = states[:,i]
-#
-#        diagram_context.SetTime(t)
-#        plant.SetPositionsAndVelocities(plant_context, x)
-#        diagram.Publish(diagram_context)
-#
-#        time.sleep(dt-3e-4)
-#    time.sleep(1)
+while True:
+    # Just keep playing back the trajectory
+    for i in range(len(timesteps)):
+        t = timesteps[i]
+        x = states[:,i]
+
+        diagram_context.SetTime(t)
+        plant.SetPositionsAndVelocities(plant_context, x)
+        diagram.Publish(diagram_context)
+
+        time.sleep(dt-3e-4)
+    time.sleep(1)

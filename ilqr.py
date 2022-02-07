@@ -134,7 +134,7 @@ class IterativeLinearQuadraticRegulator():
             luu:    2nd order partial w.r.t. u
             lux:    2nd order partial w.r.t. u and x
         """
-        lx = 2*self.Q@x
+        lx = 2*self.Q@x - 2*self.x_nom.T@self.Q
         lu = 2*self.R@u
         lxx = 2*self.Q
         luu = 2*self.R
@@ -157,8 +157,8 @@ class IterativeLinearQuadraticRegulator():
             lf_x:   gradient of terminal cost
             lf_xx:  hessian of terminal cost
         """
-        lf_x = 2*self.Q@x
-        lf_xx = 2*self.Q
+        lf_x = 2*self.Qf@x - 2*self.x_nom.T@self.Qf
+        lf_xx = 2*self.Qf
 
         return (lf_x, lf_xx)
 
@@ -292,7 +292,20 @@ class IterativeLinearQuadraticRegulator():
             x:  (n,N) numpy array containing optimal state trajectory
             u:  (m,N-1) numpy array containing optimal control tape
         """
-        st = time.time()
-        self._forward_pass()
-        self._backward_pass()
-        print(time.time()-st)
+        for i in range(20):
+            print("Interation: ", i+1)
+            self._forward_pass()
+            
+            # DEBUG: compute total cost from nominal trajectory
+            L = 0
+            for t in range(self.N-1):
+                x = self.x_bar[:,t]
+                u = self.u_bar[:,t]
+                L += (x-self.x_nom).T@self.Q@(x-self.x_nom) + u.T@self.R@u
+            x = self.x_bar[:,-1]
+            L += (x.T-self.x_nom.T)@self.Qf@(x-self.x_nom)
+            print("Cost: ", L)
+
+            self._backward_pass()
+
+        return self.x_bar, self.u_bar
