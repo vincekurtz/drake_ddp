@@ -15,7 +15,7 @@ import time
 # Parameters
 ####################################
 
-T = 2.0          # total simulation time (S)
+T = 1.5          # total simulation time (S)
 dt = 1e-2      # simulation timestep
 
 # Solver method
@@ -27,6 +27,11 @@ x0 = np.array([0,0,0,0])
 
 # Target state
 x_nom = np.array([np.pi,0,0,0])
+
+# Quadratic cost
+Q = 0.01*np.diag([0,0,1,1])
+R = 0.01*np.eye(1)
+Qf = 100*np.diag([1,1,1,1])
 
 ####################################
 # Create system diagram
@@ -76,17 +81,16 @@ if method == "ilqr":
     ilqr.SetTargetState(x_nom)
 
     # Define cost function
-    Q = 0.01*np.eye(4)
-    R = 0.01*np.eye(1)
     ilqr.SetRunningCost(Q, R)
-    Qf = 200*np.eye(4)
     ilqr.SetTerminalCost(Qf)
 
     # Set initial guess
     u_guess = np.zeros((1,num_steps-1))
     ilqr.SetInitialGuess(u_guess)
 
-    states, inputs = ilqr.Solve()
+    states, inputs, solve_time, optimal_cost = ilqr.Solve()
+    print(f"Solved in {solve_time} seconds using iLQR")
+    print(f"Optimal cost: {optimal_cost}")
     timesteps = np.arange(0.0,T,dt)
 
 #-----------------------------------------
@@ -107,8 +111,8 @@ elif method == "sqp":
     
     trajopt.prog().AddConstraint(eq( x_init, x0 ))
     x_err = x - x_nom
-    trajopt.AddRunningCost(0.01*x_err.T@x_err + 0.01*u.T@u)
-    trajopt.AddFinalCost(200*x_err.T@x_err)
+    trajopt.AddRunningCost(x_err.T@Q@x_err + u.T@R@u)
+    trajopt.AddFinalCost(x_err.T@Qf@x_err)
     
     # Solve the optimization problem
     st = time.time()
@@ -116,7 +120,9 @@ elif method == "sqp":
     solve_time = time.time() - st
     assert res.is_success(), "trajectory optimizer failed"
     solver_name = res.get_solver_id().name()
-    print(f"Solved in {solve_time} seconds using {solver_name}")
+    optimal_cost = res.get_optimal_cost()
+    print(f"Solved in {solve_time} seconds using SQP via {solver_name}")
+    print(f"Optimal cost: {optimal_cost}")
     
     # Extract the solution
     timesteps = trajopt.GetSampleTimes(res)
