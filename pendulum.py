@@ -28,7 +28,7 @@ x0 = np.array([0,0])
 # Target state
 x_nom = np.array([np.pi,0])
 
-# Quadratic cost
+# Quadratic cost int_{0^T} (x'Qx + u'Ru) + x_T*Qf*x_T
 Q = 0.01*np.diag([0,1])
 R = 0.01*np.eye(1)
 Qf = 100*np.diag([1,1])
@@ -81,7 +81,7 @@ if method == "ilqr":
     ilqr.SetTargetState(x_nom)
 
     # Define cost function
-    ilqr.SetRunningCost(Q, R)
+    ilqr.SetRunningCost(dt*Q, dt*R)
     ilqr.SetTerminalCost(Qf)
 
     # Set initial guess
@@ -111,8 +111,8 @@ elif method == "sqp":
     
     trajopt.prog().AddConstraint(eq( x_init, x0 ))
     x_err = x - x_nom
-    trajopt.AddRunningCost(x_err.T@Q/dt@x_err + u.T@R/dt@u)  # scale by dt since this running
-    trajopt.AddFinalCost(x_err.T@Qf@x_err)                   # cost is defined as an integral
+    trajopt.AddRunningCost(x_err.T@Q@x_err + u.T@R@u)
+    trajopt.AddFinalCost(x_err.T@Qf@x_err)
     
     # Solve the optimization problem
     st = time.time()

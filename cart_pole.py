@@ -28,9 +28,9 @@ x0 = np.array([0,0,0,0])
 # Target state
 x_nom = np.array([0,np.pi,0,0])
 
-# Quadratic cost
-Q = 0.001*np.diag([1,1,1,1])
-R = 0.001*np.eye(1)
+# Quadratic cost int_{0^T} (x'Qx + u'Ru) + x_T*Qf*x_T
+Q = 0.01*np.diag([1,1,1,1])
+R = 0.01*np.eye(1)
 Qf = 500*np.diag([1,1,1,1])
 
 ####################################
@@ -74,14 +74,14 @@ context_ = plant_.CreateDefaultContext()
 
 if method == "ilqr":
     num_steps = int(T/dt)
-    ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, beta=0.5)
+    ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, beta=0.2)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)
     ilqr.SetTargetState(x_nom)
 
     # Define cost function
-    ilqr.SetRunningCost(Q, R)
+    ilqr.SetRunningCost(dt*Q, dt*R)
     ilqr.SetTerminalCost(Qf)
 
     # Set initial guess
@@ -111,8 +111,8 @@ elif method == "sqp":
     
     trajopt.prog().AddConstraint(eq( x_init, x0 ))
     x_err = x - x_nom
-    trajopt.AddRunningCost(x_err.T@Q/dt@x_err + u.T@R/dt@u)  # scale by dt since running
-    trajopt.AddFinalCost(x_err.T@Qf@x_err)                   # cost is defined as integral
+    trajopt.AddRunningCost(x_err.T@Q@x_err + u.T@R@u)
+    trajopt.AddFinalCost(x_err.T@Qf@x_err)
     
     # Solve the optimization problem
     st = time.time()
