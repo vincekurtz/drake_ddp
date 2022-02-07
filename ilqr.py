@@ -56,11 +56,6 @@ class IterativeLinearQuadraticRegulator():
         self.kappa = np.zeros((self.m,self.N-1))
         self.K = np.zeros((self.m,self.n,self.N-1))
 
-        # Gradient and hessian of cost-to-go at next timestep
-        # (used in backward pass)
-        self.Vx = None
-        self.Vxx = None
-
     def SetInitialState(self, x0):
         """
         Fix the initial condition for the optimization.
@@ -119,6 +114,53 @@ class IterativeLinearQuadraticRegulator():
 
     def SetControlLimits(self, u_min, u_max):
         pass
+
+    def _running_cost_partials(self, x, u):
+        """
+        Return the partial derivatives of the (quadratic) running cost
+
+            l = x'Qx + u'Ru
+
+        for the given state and input values.
+
+        Args:
+            x:  numpy array representing state
+            u:  numpy array representing control
+
+        Returns:
+            lx:     1st order partial w.r.t. x
+            lu:     1st order partial w.r.t. u
+            lxx:    2nd order partial w.r.t. x
+            luu:    2nd order partial w.r.t. u
+            lux:    2nd order partial w.r.t. u and x
+        """
+        lx = 2*self.Q@x
+        lu = 2*self.R@u
+        lxx = 2*self.Q
+        luu = 2*self.R
+        lux = np.zeros((self.m,self.n))
+
+        return (lx, lu, lxx, luu, lux)
+
+    def _terminal_cost_partials(self, x):
+        """
+        Return the partial derivatives of the (quadratic) terminal cost
+
+            lf = x'Qfx
+
+        for the given state values. 
+
+        Args:
+            x: numpy array representing state
+
+        Returns:
+            lf_x:   gradient of terminal cost
+            lf_xx:  hessian of terminal cost
+        """
+        lf_x = 2*self.Q@x
+        lf_xx = 2*self.Q
+
+        return (lf_x, lf_xx)
 
     def _calc_dynamics(self, x, u):
         """
@@ -200,10 +242,46 @@ class IterativeLinearQuadraticRegulator():
         self.fu = fu
 
     def _backward_pass(self):
-        pass
+        """
+        Compute a quadratic approximation of the optimal cost-to-go
+        by simulating the system backward in time. Use this quadratic 
+        approximation and a first-order approximation of the system 
+        dynamics to compute the feedback controller
 
-    def _update_control(self):
-        pass
+            u = u_bar - eps*kappa - K*(x-x_bar).
+
+        Updates:
+            kappa:  feedforward control term at each timestep
+            K:      feedback control term at each timestep
+        """
+        # Store gradient and hessian of cost-to-go
+        Vx, Vxx = self._terminal_cost_partials(self.x_bar[:,-1])
+
+        # Do the backwards sweep
+        for t in np.arange(self.N-2,-1,-1):
+            x = self.x_bar[:,t]
+            u = self.u_bar[:,t]
+
+            # Get second(/first) order approximation of cost(/dynamics)
+            lx, lu, lxx, luu, lux = self._running_cost_partials(x,u)
+            fx = self.fx[:,:,t]
+            fu = self.fu[:,:,t]
+
+            # Construct second-order approximation of cost-to-go
+            Qx = lx + fx.T@Vx
+            Qu = lu + fu.T@Vx
+            Qxx = lxx + fx.T@Vxx@fx
+            Quu = luu + fu.T@Vxx@fu
+            Quu_inv = np.linalg.inv(Quu)
+            Qux = lux + fu.T@Vxx@fx
+
+            # Derive controller parameters
+            self.kappa[:,t] = Quu_inv@Qu
+            self.K[:,:,t] = Quu_inv@Qux
+
+            # Update gradient and hessian of cost-to-go
+            Vx = Qx - Qu.T@Quu_inv@Qux
+            Vxx = Qxx - Qux.T@Quu_inv@Qux
 
     def Solve(self):
         """
@@ -216,4 +294,5 @@ class IterativeLinearQuadraticRegulator():
         """
         st = time.time()
         self._forward_pass()
+        self._backward_pass()
         print(time.time()-st)
