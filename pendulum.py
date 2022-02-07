@@ -15,7 +15,7 @@ import time
 # Parameters
 ####################################
 
-T = 1.5          # total simulation time (S)
+T = 2.0         # total simulation time (S)
 dt = 1e-2      # simulation timestep
 
 # Solver method
