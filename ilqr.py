@@ -5,6 +5,7 @@
 ##
 
 from pydrake.all import *
+import time
 
 class IterativeLinearQuadraticRegulator():
     """
@@ -162,7 +163,7 @@ class IterativeLinearQuadraticRegulator():
         fx = G[:,:self.n]
         fu = G[:,self.n:]
 
-        return (ExtractValue(x_next), fx, fu)
+        return (ExtractValue(x_next).flatten(), fx, fu)
 
     def _forward_pass(self):
         """
@@ -171,8 +172,32 @@ class IterativeLinearQuadraticRegulator():
 
             u = u_bar - eps*kappa - K*(x-x_bar).
 
+        Updates:
+            u_bar:  The current best-guess of optimal u
+            x_bar:  The current best-guess of optimal x
+            fx:     Dynamics gradient w.r.t. x
+            fu:     Dynamics gradient w.r.t. u
         """
-        pass
+        x = np.zeros((self.n,self.N))
+        u = np.zeros((self.m,self.N-1))
+        fx = np.zeros((self.n,self.n,self.N-1))
+        fu = np.zeros((self.n,self.m,self.N-1))
+
+        # Set initial state
+        x[:,0] = self.x0
+
+        # simulate forward
+        for t in range(0,self.N-1):
+            u[:,t] = self.u_bar[:,t] - self.eps*self.kappa[:,t] - self.K[:,:,t]@(x[:,t] - self.x_bar[:,t])
+            x[:,t+1], fx[:,:,t], fu[:,:,t] = self._calc_dynamics(x[:,t], u[:,t])
+
+        # TODO: line search
+
+        # Update stored values
+        self.u_bar = u
+        self.x_bar = x
+        self.fx = fx
+        self.fu = fu
 
     def _backward_pass(self):
         pass
@@ -189,12 +214,6 @@ class IterativeLinearQuadraticRegulator():
             x:  (n,N) numpy array containing optimal state trajectory
             u:  (m,N-1) numpy array containing optimal control tape
         """
-        x = np.array([0,0,0,0])
-        u = np.array([1])
-
-        x_next, fx, fu = self._calc_dynamics(x, u)
-
-        print(x_next)
-        print(fx)
-        print(fu)
-
+        st = time.time()
+        self._forward_pass()
+        print(time.time()-st)
