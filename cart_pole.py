@@ -15,7 +15,7 @@ import time
 # Parameters
 ####################################
 
-T = 2.0        # total simulation time (S)
+T = 1.0        # total simulation time (S)
 dt = 1e-2      # simulation timestep
 
 # Solver method
@@ -23,15 +23,15 @@ dt = 1e-2      # simulation timestep
 method = "ilqr"
 
 # Initial state
-x0 = np.array([0,0,0,0])
+x0 = np.array([0,np.pi+0.2,-0.2,0])
 
 # Target state
 x_nom = np.array([0,np.pi,0,0])
 
 # Quadratic cost int_{0^T} (x'Qx + u'Ru) + x_T*Qf*x_T
-Q = 0.01*np.diag([1,1,1,1])
+Q = np.diag([5,5,0.01,0.01])
 R = 0.01*np.eye(1)
-Qf = 500*np.diag([1,1,1,1])
+Qf = np.diag([100,10,10,10])
 
 ####################################
 # Tools for system setup
@@ -85,7 +85,7 @@ if method == "ilqr":
 
     # Set up the optimizer
     num_steps = int(T/dt)
-    ilqr = IterativeLinearQuadraticRegulator(plant_, context_, num_steps, beta=0.2)
+    ilqr = IterativeLinearQuadraticRegulator(plant_, context_, num_steps, beta=0.9)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)
