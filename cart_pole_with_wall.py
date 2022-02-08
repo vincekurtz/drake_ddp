@@ -40,13 +40,23 @@ plant.RegisterCollisionGeometry(pole, X_BP, Sphere(radius), "collision", ball_pr
 orange = np.array([1.0, 0.55, 0.0, 0.5])
 plant.RegisterVisualGeometry(pole, X_BP, Sphere(radius), "visual", orange)
 
-# Add a ground with rigid hydroelastic contact
-ground_props = ProximityProperties()
-AddRigidHydroelasticProperties(ground_props)
-AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=ground_props)
-plant.RegisterCollisionGeometry(
-        plant.world_body(), RigidTransform(), HalfSpace(), 
-        "ground_collision", ground_props)
+# Add a wall with rigid hydroelastic contact
+l,w,h = (0.05,1,2)   
+I_W = SpatialInertia(1, np.zeros(3), UnitInertia.SolidBox(l,w,h))
+wall_instance = plant.AddModelInstance("wall")
+wall = plant.AddRigidBody("wall", wall_instance, I_W)
+wall_frame = plant.GetFrameByName("wall", wall_instance)
+X_W = RigidTransform()
+X_W.set_translation([-0.3,0,0])
+plant.WeldFrames(plant.world_frame(), wall_frame, X_W)
+
+plant.RegisterVisualGeometry(wall, RigidTransform(), Box(l,w,h), "wall_visual", orange)
+
+wall_props = ProximityProperties()
+AddRigidHydroelasticProperties(wall_props)
+AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=wall_props)
+plant.RegisterCollisionGeometry(wall, RigidTransform(), 
+        Box(l,w,h), "wall_collision", wall_props)
 
 # Choose contact model
 plant.set_contact_surface_representation(
