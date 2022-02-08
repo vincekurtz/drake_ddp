@@ -20,14 +20,14 @@ T = 1.0
 dt = 1e-2
 
 # Initial state
-x0 = np.array([0,np.pi+0.2,-0.2,0])
+x0 = np.array([0,np.pi-0.2,0,0])
 
 # Target state
 x_nom = np.array([0,np.pi,0,0])
 
 # Quadratic cost
-Q = np.diag([5,5,0.01,0.01])
-R = 0.01*np.eye(1)
+Q = np.diag([1,1,0.01,0.01])
+R = 0.001*np.eye(1)
 Qf = np.diag([100,100,10,10])
 
 # Contact model parameters
