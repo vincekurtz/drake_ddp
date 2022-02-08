@@ -16,11 +16,12 @@ class IterativeLinearQuadraticRegulator():
 
     using iLQR.
     """
-    def __init__(self, plant, num_timesteps, delta=1e-2, beta=0.95, gamma=0.0):
+    def __init__(self, plant, context, num_timesteps, delta=1e-2, beta=0.95, gamma=0.0):
         """
         Args:
             plant:          Drake MultibodyPlant describing the discrete-time dynamics
-                             x_{t+1} = f(x_t,u_t)
+                             x_{t+1} = f(x_t,u_t). Must be AutoDiffXd type.
+            context:        Drake context corresponding to the given plant
             num_timesteps:  Number of timesteps to consider in the optimization
             delta:          Termination criterion - the algorithm ends when the improvement
                              in the total cost is less than delta. 
@@ -31,8 +32,8 @@ class IterativeLinearQuadraticRegulator():
         """
         assert plant.IsDifferenceEquationSystem()[0],  "must be a discrete-time system"
 
-        self.plant = plant.ToAutoDiffXd()   # convert to autodiff
-        self.context = self.plant.CreateDefaultContext()
+        self.plant = plant
+        self.context = context
 
         self.n = self.plant.num_multibody_states()
         self.m = self.plant.num_actuators()

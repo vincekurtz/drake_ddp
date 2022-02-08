@@ -20,7 +20,7 @@ dt = 1e-2      # simulation timestep
 
 # Solver method
 # must be "ilqr" or "sqp"
-method = "ilqr"
+method = "sqp"
 
 # Initial state
 x0 = np.array([0,0])
@@ -34,15 +34,22 @@ R = 0.01*np.eye(1)
 Qf = 100*np.diag([1,1])
 
 ####################################
+# Tools for system setup
+####################################
+
+def create_system_model(plant):
+    urdf = FindResourceOrThrow("drake/examples/pendulum/Pendulum.urdf")
+    robot = Parser(plant=plant).AddModelFromFile(urdf)
+    plant.Finalize()
+    return plant
+
+####################################
 # Create system diagram
 ####################################
 builder = DiagramBuilder()
 
 plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
-urdf = FindResourceOrThrow("drake/examples/pendulum/Pendulum.urdf")
-robot = Parser(plant=plant).AddModelFromFile(urdf)
-
-plant.Finalize()
+plant = create_system_model(plant)
 assert plant.geometry_source_is_registered()
 
 controller = builder.AddSystem(ConstantVectorSource(np.zeros(1)))
@@ -61,20 +68,24 @@ plant_context = diagram.GetMutableSubsystemContext(
 #####################################
 # Solve Trajectory Optimization
 #####################################
-
-# Create a system model to do the optimization over
+# Create system model
 plant_ = MultibodyPlant(dt)
-Parser(plant_).AddModelFromFile(urdf)
-plant_.Finalize()
-context_ = plant_.CreateDefaultContext()
+plant_ = create_system_model(plant_).ToAutoDiffXd()
+
+builder_ = DiagramBuilder_[AutoDiffXd]()
+plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, plant_)
+diagram_ = builder_.Build()
+diagram_context_ = diagram_.CreateDefaultContext()
+context_ = diagram_.GetMutableSubsystemContext(plant_, diagram_context_)
 
 #-----------------------------------------
 # DDP method
 #-----------------------------------------
 
 if method == "ilqr":
+    # Set up the optimizer
     num_steps = int(T/dt)
-    ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps)
+    ilqr = IterativeLinearQuadraticRegulator(plant_, context_, num_steps)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)
@@ -98,6 +109,10 @@ if method == "ilqr":
 #-----------------------------------------
 
 elif method == "sqp":
+    # Convert to scalar type type
+    plant_ = plant_.ToScalarType[float]()
+    context_ = plant_.CreateDefaultContext()
+
     # Set up the solver object
     trajopt = DirectTranscription(
             plant_, context_, 
