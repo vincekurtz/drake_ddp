@@ -1,1 +1,2 @@
-Code for trajectory optimization using Differential Dynamic Programming (DDP) in Drake.
+Code for trajectory optimization using Differential Dynamic Programming (DDP) 
+and Iterative LQR (iLQR) in Drake.
