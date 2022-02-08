@@ -23,7 +23,7 @@ dt = 1e-2      # simulation timestep
 method = "ilqr"
 
 # Initial state
-x0 = np.array([0,np.pi+0.2,-0.2,0])
+x0 = np.array([0,np.pi-0.2,0.2,0])
 
 # Target state
 x_nom = np.array([0,np.pi,0,0])
