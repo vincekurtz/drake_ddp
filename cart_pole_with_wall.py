@@ -92,10 +92,23 @@ plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 # Solve Trajectory Optimization
 ####################################
 
-# Create a system model to do the optimization over
-plant_ = MultibodyPlant(dt)
+# Create a system model (w/o visualizer) to do the optimization over
+builder_ = DiagramBuilder()
+plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
 plant_ = create_system_model(plant_)
-context_ = plant_.CreateDefaultContext()
+diagram_ = builder_.Build()
+
+# Convert this system model to AutoDiff type
+diagram_ = diagram_.ToAutoDiffXd()
+diagram_context_ = diagram_.CreateDefaultContext()
+plant_ = diagram_.GetSubsystemByName("plant")
+plant_context_ = diagram_.GetMutableSubsystemContext(plant_, diagram_context_)
+
+
+
+
+
+
 
 ####################################
 # Run Simulation
