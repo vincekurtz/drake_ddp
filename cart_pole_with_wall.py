@@ -17,7 +17,7 @@ from ilqr import IterativeLinearQuadraticRegulator
 
 T = 1.0 
 dt = 1e-2
-playback_rate = 0.2
+playback_rate = 1.0
 
 # Initial state
 x0 = np.array([0,np.pi+0.2,0,0])
@@ -31,7 +31,7 @@ R = 0.001*np.eye(1)
 Qf = np.diag([100,100,10,10])
 
 # Contact model parameters
-dissipation = 5.0              # controls "bounciness" of collisions: lower is bouncier
+dissipation = 0.0              # controls "bounciness" of collisions: lower is bouncier
 hydroelastic_modulus = 2e5     # controls "squishiness" of collisions: lower is squishier
 resolution_hint = 0.05         # smaller means a finer mesh
 
@@ -53,7 +53,10 @@ def create_system_model(plant):
     X_BP = RigidTransform()
     ball_props = ProximityProperties()
     AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus, ball_props)
-    AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=ball_props)
+    if contact_model == ContactModel.kPoint:
+        AddContactMaterial(friction=CoulombFriction(), properties=ball_props)
+    else:
+        AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=ball_props)
     plant.RegisterCollisionGeometry(pole, X_BP, Sphere(radius), "collision", ball_props)
     orange = np.array([1.0, 0.55, 0.0, 0.5])
     plant.RegisterVisualGeometry(pole, X_BP, Sphere(radius), "visual", orange)
@@ -72,7 +75,10 @@ def create_system_model(plant):
     
     wall_props = ProximityProperties()
     AddRigidHydroelasticProperties(wall_props)
-    AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=wall_props)
+    if contact_model == ContactModel.kPoint:
+        AddContactMaterial(friction=CoulombFriction(), properties=wall_props)
+    else:
+        AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=wall_props)
     plant.RegisterCollisionGeometry(wall, RigidTransform(), 
             Box(l,w,h), "wall_collision", wall_props)
     
@@ -127,7 +133,7 @@ ilqr.SetTerminalCost(Qf)
 
 # Set initial guess
 #np.random.seed(0)
-#u_guess = 0.001*np.random.normal(size=(1,num_steps-1))
+#u_guess = 0.01*np.random.normal(size=(1,num_steps-1))
 u_guess = np.zeros((1,num_steps-1))
 ilqr.SetInitialGuess(u_guess)
 
