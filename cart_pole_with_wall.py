@@ -28,11 +28,11 @@ x_nom = np.array([0,np.pi,0,0])
 # Quadratic cost
 Q = np.diag([1,1,0.01,0.01])
 R = 0.001*np.eye(1)
-Qf = np.diag([100,100,10,10])
+Qf = np.diag([200,100,10,10])
 
 # Contact model parameters
 dissipation = 0.0              # controls "bounciness" of collisions: lower is bouncier
-hydroelastic_modulus = 2e5     # controls "squishiness" of collisions: lower is squishier
+hydroelastic_modulus = 2e7     # controls "squishiness" of collisions: lower is squishier
 resolution_hint = 0.05         # smaller means a finer mesh
 
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback

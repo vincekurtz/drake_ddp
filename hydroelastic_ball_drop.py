@@ -25,19 +25,22 @@ builder = DiagramBuilder()
 plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
 
 # Add a ball with compliant hydroelastic contact
-G_Bcm = UnitInertia.SolidSphere(radius)
-M_Bcm = SpatialInertia(mass, np.zeros(3), G_Bcm)
-ball = plant.AddRigidBody("ball", M_Bcm)
+#G_Bcm = UnitInertia.SolidSphere(radius)
+#M_Bcm = SpatialInertia(mass, np.zeros(3), G_Bcm)
+#ball = plant.AddRigidBody("ball", M_Bcm)
+#
+#X_BS = RigidTransform()
+#ball_props = ProximityProperties()
+#AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus, ball_props)
+#AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=ball_props)
+#plant.RegisterCollisionGeometry(ball, X_BS, Sphere(radius),
+#        "ball_collision", ball_props)
+#
+#orange = np.array([1.0, 0.55, 0.0, 0.5])
+#plant.RegisterVisualGeometry(ball, X_BS, Sphere(radius), "visual", orange)
 
-X_BS = RigidTransform()
-ball_props = ProximityProperties()
-AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus, ball_props)
-AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=ball_props)
-plant.RegisterCollisionGeometry(ball, X_BS, Sphere(radius),
-        "ball_collision", ball_props)
-
-orange = np.array([1.0, 0.55, 0.0, 0.5])
-plant.RegisterVisualGeometry(ball, X_BS, Sphere(radius), "visual", orange)
+# Add a ball with compliant hydroelastic contact from file
+ball = Parser(plant).AddModelFromFile("models/sphere/sphere.urdf")
 
 # Add a ground with rigid hydroelastic contact
 ground_props = ProximityProperties()
