@@ -15,17 +15,17 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 0.5
+T = 0.2
 dt = 1e-2
-playback_rate = 1.0
+playback_rate = 0.2
 
 # Some useful joint angle definitions
 q_home = np.array([0, np.pi/12, np.pi, 4.014-2*np.pi, 0, 0.9599, np.pi/2])
 q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, np.pi/2])
-q_start = np.array([0.25, np.pi/3, np.pi, 4.4-2*np.pi, 0, 0.9599, np.pi/2])
+q_start = np.array([0.0, np.pi/4+0.15, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
 
 q_ball_start = np.array([0,0,0,1,0.5,0,0.1])
-q_ball_target = np.array([0,0,0,1,0.5,0.1,0.1])
+q_ball_target = np.array([0,0,0,1,0.6,0.0,0.1])
 
 # Initial state
 x0 = np.hstack([q_start, q_ball_start, np.zeros(13)])
@@ -39,7 +39,7 @@ Qv_robot = 1.0*np.ones(7)
 Qq_ball = np.array([0,0,0,0,100,100,100])
 Qv_ball = np.ones(6)
 Q_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, Qv_ball])
-Qf_diag = np.hstack([Qq_robot, 10*Qq_ball, Qv_robot, 10*Qv_ball])
+Qf_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, Qv_ball])
 
 Q = np.diag(Q_diag)
 R = 0.01*np.eye(7)
@@ -146,7 +146,7 @@ tau_g = -plant.CalcGravityGeneralizedForces(plant_context)
 S = plant.MakeActuationMatrix().T
 u_guess = S@np.repeat(tau_g[np.newaxis].T, num_steps-1, axis=1)
 
-#u_guess = np.zeros((plant.num_actuators(),num_steps-1))
+u_guess = np.zeros((plant.num_actuators(),num_steps-1))
 ilqr.SetInitialGuess(u_guess)
 
 # Solve the optimization problem
@@ -172,7 +172,7 @@ while True:
         diagram.Publish(diagram_context)
 
         time.sleep(1/playback_rate*dt-4e-4)
-#    time.sleep(1)
+    time.sleep(1)
 
 #####################################
 ## Run Simulation
