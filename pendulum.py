@@ -72,7 +72,7 @@ plant_context = diagram.GetMutableSubsystemContext(
 # Create system model for the solver to use
 plant_ = MultibodyPlant(dt)
 plant_ = create_system_model(plant_)
-input_port = plant_.get_actuation_input_port().get_index()
+input_port_index = plant_.get_actuation_input_port().get_index()
 
 #-----------------------------------------
 # DDP method
@@ -81,7 +81,8 @@ input_port = plant_.get_actuation_input_port().get_index()
 if method == "ilqr":
     # Set up the optimizer
     num_steps = int(T/dt)
-    ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, input_port=input_port)
+    ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
+            input_port_index=input_port_index)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)
@@ -109,7 +110,8 @@ elif method == "sqp":
 
     # Set up the solver object
     trajopt = DirectTranscription(
-            plant_, plant_context_, 
+            plant_, context_, 
+            input_port_index=input_port_index,
             num_time_samples=int(T/dt))
     
     # Add constraints

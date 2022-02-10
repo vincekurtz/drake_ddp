@@ -17,20 +17,20 @@ class IterativeLinearQuadraticRegulator():
     using iLQR.
     """
     def __init__(self, system, num_timesteps, 
-            input_port=0, delta=1e-2, beta=0.95, gamma=0.0):
+            input_port_index=0, delta=1e-2, beta=0.95, gamma=0.0):
         """
         Args:
-            system:         Drake System describing the discrete-time dynamics
-                             x_{t+1} = f(x_t,u_t). Must be discrete-time.
-            num_timesteps:  Number of timesteps to consider in the optimization.
-            input_port:     InputPortIndex for the control input u_t. Default is to
-                             use the first port. 
-            delta:          Termination criterion - the algorithm ends when the improvement
-                             in the total cost is less than delta. 
-            beta:           Linesearch parameter in (0,1). Higher values lead to smaller
-                             linesearch steps. 
-            gamma:          Linesearch parameter in [0,1). Higher values mean linesearch
-                             is performed more often in hopes of larger cost reductions.
+            system:             Drake System describing the discrete-time dynamics
+                                 x_{t+1} = f(x_t,u_t). Must be discrete-time.
+            num_timesteps:      Number of timesteps to consider in the optimization.
+            input_port_index:   InputPortIndex for the control input u_t. Default is to
+                                 use the first port. 
+            delta:              Termination criterion - the algorithm ends when the improvement
+                                 in the total cost is less than delta. 
+            beta:               Linesearch parameter in (0,1). Higher values lead to smaller
+                                 linesearch steps. 
+            gamma:              Linesearch parameter in [0,1). Higher values mean linesearch
+                                 is performed more often in hopes of larger cost reductions.
         """
         assert system.IsDifferenceEquationSystem()[0],  "must be a discrete-time system"
 
@@ -38,12 +38,12 @@ class IterativeLinearQuadraticRegulator():
         # Computations using this system are fast but don't support gradients
         self.system = system
         self.context = self.system.CreateDefaultContext()
-        self.input_port = self.system.get_input_port(input_port)
+        self.input_port = self.system.get_input_port(input_port_index)
 
         # Autodiff copy of the system for computing dynamics gradients
         self.system_ad = system.ToAutoDiffXd()
         self.context_ad = self.system_ad.CreateDefaultContext()
-        self.input_port_ad = self.system_ad.get_input_port(input_port)
+        self.input_port_ad = self.system_ad.get_input_port(input_port_index)
        
         # Set some parameters
         self.N = num_timesteps
@@ -333,7 +333,7 @@ class IterativeLinearQuadraticRegulator():
             L += (x[:,t]-self.x_nom).T@self.Q@(x[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
             dV += -eps*(1-eps/2)*self.dV_coeff[t]
         et = time.time()-st
-        print("forward pass w/ partials: ",et)
+        #print("forward pass w/ partials: ",et)
 
         # DEBUG
         #st = time.time()

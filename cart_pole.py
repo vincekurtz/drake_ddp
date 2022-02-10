@@ -20,16 +20,16 @@ dt = 1e-2      # simulation timestep
 
 # Solver method
 # must be "ilqr" or "sqp"
-method = "ilqr"
+method = "sqp"
 
 # Initial state
-x0 = np.array([0,np.pi-0.2,0,0])
+x0 = np.array([0,np.pi-0.1,0,0])
 
 # Target state
 x_nom = np.array([0,np.pi,0,0])
 
 # Quadratic cost int_{0^T} (x'Qx + u'Ru) + x_T*Qf*x_T
-Q = np.diag([1,1,0.01,0.01])
+Q = np.diag([10,10,0.1,0.1])
 R = 0.001*np.eye(1)
 Qf = np.diag([100,100,10,10])
 
@@ -67,25 +67,22 @@ plant_context = diagram.GetMutableSubsystemContext(
 #####################################
 # Solve Trajectory Optimization
 #####################################
+    
+# Create system model for controller
+plant_ = MultibodyPlant(dt)
+plant_ = create_system_model(plant_)
+input_port_index = plant_.get_actuation_input_port().get_index()
 
 #-----------------------------------------
 # DDP method
 #-----------------------------------------
 
 if method == "ilqr":
-    # Create system model
-    plant_ = MultibodyPlant(dt)
-    plant_ = create_system_model(plant_).ToAutoDiffXd()
-    
-    builder_ = DiagramBuilder_[AutoDiffXd]()
-    plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, plant_)
-    diagram_ = builder_.Build()
-    diagram_context_ = diagram_.CreateDefaultContext()
-    context_ = diagram_.GetMutableSubsystemContext(plant_, diagram_context_)
-
     # Set up the optimizer
     num_steps = int(T/dt)
-    ilqr = IterativeLinearQuadraticRegulator(plant_, context_, num_steps, beta=0.9)
+    ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
+            input_port_index=input_port_index,
+            beta=0.9)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)
@@ -109,15 +106,12 @@ if method == "ilqr":
 #-----------------------------------------
 
 elif method == "sqp":
-    # Create a system model to do the optimization over
-    plant_ = MultibodyPlant(dt)
-    plant_ = create_system_model(plant_)
     context_ = plant_.CreateDefaultContext()
 
     # Set up the solver object
     trajopt = DirectTranscription(
             plant_, context_, 
-            input_port_index=plant.get_actuation_input_port().get_index(),
+            input_port_index=input_port_index,
             num_time_samples=int(T/dt))
     
     # Add constraints

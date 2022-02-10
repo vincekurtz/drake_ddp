@@ -67,40 +67,6 @@ def create_system_model(plant):
 
     # Add a ball with compliant hydroelastic contact
 
-    ## Add a ball with compliant hydroelastic contact to the end of the cart-pole system
-    #radius = 0.05
-    #pole = plant.GetBodyByName("Pole")
-    #X_BP = RigidTransform()
-    #ball_props = ProximityProperties()
-    #AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus, ball_props)
-    #if contact_model == ContactModel.kPoint:
-    #    AddContactMaterial(friction=CoulombFriction(), properties=ball_props)
-    #else:
-    #    AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=ball_props)
-    #plant.RegisterCollisionGeometry(pole, X_BP, Sphere(radius), "collision", ball_props)
-    #orange = np.array([1.0, 0.55, 0.0, 0.5])
-    #plant.RegisterVisualGeometry(pole, X_BP, Sphere(radius), "visual", orange)
-    #
-    ## Add a wall with rigid hydroelastic contact
-    #l,w,h = (0.1,1,2)   
-    #I_W = SpatialInertia(1, np.zeros(3), UnitInertia.SolidBox(l,w,h))
-    #wall_instance = plant.AddModelInstance("wall")
-    #wall = plant.AddRigidBody("wall", wall_instance, I_W)
-    #wall_frame = plant.GetFrameByName("wall", wall_instance)
-    #X_W = RigidTransform()
-    #X_W.set_translation([-0.5,0,0])
-    #plant.WeldFrames(plant.world_frame(), wall_frame, X_W)
-    #
-    #plant.RegisterVisualGeometry(wall, RigidTransform(), Box(l,w,h), "wall_visual", orange)
-    #
-    #wall_props = ProximityProperties()
-    #AddRigidHydroelasticProperties(wall_props)
-    #if contact_model == ContactModel.kPoint:
-    #    AddContactMaterial(friction=CoulombFriction(), properties=wall_props)
-    #else:
-    #    AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=wall_props)
-    #plant.RegisterCollisionGeometry(wall, RigidTransform(), 
-    #        Box(l,w,h), "wall_collision", wall_props)
     
     # Choose contact model
     plant.set_contact_surface_representation(mesh_type)
@@ -133,17 +99,12 @@ plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 builder_ = DiagramBuilder()
 plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
 plant_ = create_system_model(plant_)
-diagram_ = builder_.Build()
-
-# Convert this system model to AutoDiff type
-diagram_ = diagram_.ToAutoDiffXd()
-diagram_context_ = diagram_.CreateDefaultContext()
-plant_ = diagram_.GetSubsystemByName("plant")
-plant_context_ = diagram_.GetMutableSubsystemContext(plant_, diagram_context_)
+builder_.ExportInput(plant_.get_actuation_input_port(), "control")
+system_ = builder_.Build()
 
 # Set up the optimizer
 num_steps = int(T/dt)
-ilqr = IterativeLinearQuadraticRegulator(plant_, plant_context_, num_steps, beta=0.5)
+ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5)
 
 # Define the optimization problem
 ilqr.SetInitialState(x0)
