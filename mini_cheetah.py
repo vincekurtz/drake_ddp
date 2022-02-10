@@ -15,7 +15,7 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 0.3
+T = 0.5
 dt = 1e-2
 playback_rate = 0.2
 
@@ -35,8 +35,8 @@ x0 = np.hstack([q0, np.zeros(18)])
 
 # Target state
 x_nom = np.hstack([q0, np.zeros(18)])
-x_nom[4] += 0.20  # base x position
-x_nom[5] += 0.10  # base y position
+x_nom[4] += 0.30  # base x position
+x_nom[5] += 0.00  # base y position
 x_nom[6] += 0.00  # base z position
 
 # Quadratic cost
@@ -55,8 +55,8 @@ contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or Hydroelast
 mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 
 dissipation = 0
-mu_static = 0.05
-mu_dynamic = 0.02
+mu_static = 0.5
+mu_dynamic = 0.2
 
 ####################################
 # Tools for system setup
