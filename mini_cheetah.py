@@ -35,8 +35,8 @@ x0 = np.hstack([q0, np.zeros(18)])
 
 # Target state
 x_nom = np.hstack([q0, np.zeros(18)])
-x_nom[4] += 0.10  # base x position
-x_nom[5] += 0.10  # base y position
+x_nom[4] += 0.50  # base x position
+x_nom[5] += 0.00  # base y position
 x_nom[6] += 0.00  # base z position
 
 # Quadratic cost
