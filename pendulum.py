@@ -68,15 +68,18 @@ plant_context = diagram.GetMutableSubsystemContext(
 #####################################
 # Solve Trajectory Optimization
 #####################################
-# Create system model
-plant_ = MultibodyPlant(dt)
-plant_ = create_system_model(plant_).ToAutoDiffXd()
 
-builder_ = DiagramBuilder_[AutoDiffXd]()
-plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, plant_)
-diagram_ = builder_.Build()
-diagram_context_ = diagram_.CreateDefaultContext()
-context_ = diagram_.GetMutableSubsystemContext(plant_, diagram_context_)
+# Create system model for the solver to use. This system model
+# has a single input port for the control and doesn't include
+# any visualizer stuff. 
+#builder_ = DiagramBuilder()
+#plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
+#plant_ = create_system_model(plant_)
+#builder_.ExportInput(plant_.get_actuation_input_port(), "control")
+#system_ = builder_.Build()
+
+plant_ = MultibodyPlant(dt)
+plant_ = create_system_model(plant_)
 
 #-----------------------------------------
 # DDP method
@@ -85,7 +88,9 @@ context_ = diagram_.GetMutableSubsystemContext(plant_, diagram_context_)
 if method == "ilqr":
     # Set up the optimizer
     num_steps = int(T/dt)
-    ilqr = IterativeLinearQuadraticRegulator(plant_, context_, num_steps)
+    
+    input_port = plant_.get_actuation_input_port().get_index()
+    ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, input_port=input_port)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)
@@ -109,14 +114,11 @@ if method == "ilqr":
 #-----------------------------------------
 
 elif method == "sqp":
-    # Convert to scalar type type
-    plant_ = plant_.ToScalarType[float]()
-    context_ = plant_.CreateDefaultContext()
+    system_context_ = system_.CreateDefaultContext()
 
     # Set up the solver object
     trajopt = DirectTranscription(
-            plant_, context_, 
-            input_port_index=plant.get_actuation_input_port().get_index(),
+            system_, system_context_, 
             num_time_samples=int(T/dt))
     
     # Add constraints

@@ -16,13 +16,15 @@ class IterativeLinearQuadraticRegulator():
 
     using iLQR.
     """
-    def __init__(self, plant, context, num_timesteps, delta=1e-2, beta=0.95, gamma=0.0):
+    def __init__(self, system, num_timesteps, 
+            input_port=0, delta=1e-2, beta=0.95, gamma=0.0):
         """
         Args:
-            plant:          Drake MultibodyPlant describing the discrete-time dynamics
-                             x_{t+1} = f(x_t,u_t). Must be AutoDiffXd type.
-            context:        Drake context corresponding to the given plant
-            num_timesteps:  Number of timesteps to consider in the optimization
+            system:         Drake System describing the discrete-time dynamics
+                             x_{t+1} = f(x_t,u_t). Must be discrete-time.
+            num_timesteps:  Number of timesteps to consider in the optimization.
+            input_port:     InputPortIndex for the control input u_t. Default is to
+                             use the first port. 
             delta:          Termination criterion - the algorithm ends when the improvement
                              in the total cost is less than delta. 
             beta:           Linesearch parameter in (0,1). Higher values lead to smaller
@@ -30,35 +32,45 @@ class IterativeLinearQuadraticRegulator():
             gamma:          Linesearch parameter in [0,1). Higher values mean linesearch
                              is performed more often in hopes of larger cost reductions.
         """
-        assert plant.IsDifferenceEquationSystem()[0],  "must be a discrete-time system"
+        assert system.IsDifferenceEquationSystem()[0],  "must be a discrete-time system"
 
-        self.plant = plant
-        self.context = context
+        # float-type copy of the system and context for linesearch.
+        # Computations using this system are fast but don't support gradients
+        self.system = system
+        self.context = self.system.CreateDefaultContext()
+        self.input_port = self.system.get_input_port(input_port)
 
-        self.n = self.plant.num_multibody_states()
-        self.m = self.plant.num_actuators()
-        
+        # Autodiff copy of the system for computing dynamics gradients
+        self.system_ad = system.ToAutoDiffXd()
+        self.context_ad = self.system_ad.CreateDefaultContext()
+        self.input_port_ad = self.system_ad.get_input_port(input_port)
+       
+        # Set some parameters
         self.N = num_timesteps
         self.delta = delta
         self.beta = beta
         self.gamma = gamma
 
+        # Define state and input sizes
+        self.n = self.context.get_discrete_state_vector().size()
+        self.m = self.input_port.size()
+
         # Initial and target states
-        self.x0 = None
-        self.x_xom = None
+        self.x0 = np.zeros(self.n)
+        self.x_xom = np.zeros(self.n)
 
         # Quadratic cost terms
-        self.Q = None
-        self.R = None
-        self.Qf = None
+        self.Q = np.eye(self.n)
+        self.R = np.eye(self.m)
+        self.Qf = np.eye(self.n)
 
         # Arrays to store best guess of control and state trajectory
         self.x_bar = np.zeros((self.n,self.N))
         self.u_bar = np.zeros((self.m,self.N-1))
 
         # Arrays to store dynamics gradients
-        self.fx = None
-        self.fu = None
+        self.fx = np.zeros((self.n,self.n,self.N-1))
+        self.fu = np.zeros((self.n,self.m,self.N-1))
 
         # Local feedback gains u = u_bar - eps*kappa_t - K_t*(x-x_bar)
         self.kappa = np.zeros((self.m,self.N-1))
@@ -173,8 +185,33 @@ class IterativeLinearQuadraticRegulator():
         lf_xx = 2*self.Qf
 
         return (lf_x, lf_xx)
-
+    
     def _calc_dynamics(self, x, u):
+        """
+        Given a system state (x) and a control input (u),
+        compute the next state 
+
+            x_next = f(x,u)
+
+        Args:   
+            x:  An (n,) numpy array representing the state
+            u:  An (m,) numpy array representing the control input
+
+        Returns:
+            x_next: An (n,) numpy array representing the next state
+        """
+        # Set input and state variables in our stored model accordingly
+        self.context.SetDiscreteState(x)
+        self.input_port.FixValue(self.context, u)
+
+        # Compute the forward dynamics x_next = f(x,u)
+        state = self.context.get_discrete_state()
+        self.system.CalcDiscreteVariableUpdates(self.context, state)
+        x_next = state.get_vector().value().flatten()
+
+        return x_next
+
+    def _calc_dynamics_with_partials(self, x, u):
         """
         Given a system state (x) and a control input (u),
         compute the next state 
@@ -204,12 +241,12 @@ class IterativeLinearQuadraticRegulator():
         u_ad = xu_ad[self.n:]
 
         # Set input and state variables in our stored model accordingly
-        self.plant.SetPositionsAndVelocities(self.context, x_ad)
-        self.plant.get_actuation_input_port().FixValue(self.context, u_ad)
+        self.context_ad.SetDiscreteState(x_ad)
+        self.input_port_ad.FixValue(self.context_ad, u_ad)
 
         # Compute the forward dynamics x_next = f(x,u)
-        state = self.context.get_discrete_state()
-        self.plant.CalcDiscreteVariableUpdates(self.context, state)
+        state = self.context_ad.get_discrete_state()
+        self.system_ad.CalcDiscreteVariableUpdates(self.context_ad, state)
         x_next = state.get_vector().CopyToVector()
        
         # Compute partial derivatives
@@ -218,7 +255,7 @@ class IterativeLinearQuadraticRegulator():
         fu = G[:,self.n:]
 
         return (ExtractValue(x_next).flatten(), fx, fu)
-
+    
     def _forward_pass(self, L_last):
         """
         Simulate the system forward in time using the local feedback
@@ -288,12 +325,26 @@ class IterativeLinearQuadraticRegulator():
         x[:,0] = self.x0
 
         # simulate forward
+        st = time.time()
         for t in range(0,self.N-1):
             u[:,t] = self.u_bar[:,t] - eps*self.kappa[:,t] - self.K[:,:,t]@(x[:,t] - self.x_bar[:,t])
-            x[:,t+1], fx[:,:,t], fu[:,:,t] = self._calc_dynamics(x[:,t], u[:,t])
+            x[:,t+1], fx[:,:,t], fu[:,:,t] = self._calc_dynamics_with_partials(x[:,t], u[:,t])
 
             L += (x[:,t]-self.x_nom).T@self.Q@(x[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
             dV += -eps*(1-eps/2)*self.dV_coeff[t]
+        et = time.time()-st
+        print("forward pass w/ partials: ",et)
+
+        # DEBUG
+        st = time.time()
+        for t in range(0,self.N-1):
+            u[:,t] = self.u_bar[:,t] - eps*self.kappa[:,t] - self.K[:,:,t]@(x[:,t] - self.x_bar[:,t])
+            x[:,t+1] = self._calc_dynamics(x[:,t], u[:,t])
+
+            L += (x[:,t]-self.x_nom).T@self.Q@(x[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
+            dV += -eps*(1-eps/2)*self.dV_coeff[t]
+        et = time.time()-st
+        print("forward pass w/o partials: ",et)
 
         L += (x[:,-1]-self.x_nom).T@self.Qf@(x[:,-1]-self.x_nom)
 
