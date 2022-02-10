@@ -211,24 +211,20 @@ class IterativeLinearQuadraticRegulator():
 
         return x_next
 
-    def _calc_dynamics_with_partials(self, x, u):
+    def _calc_dynamics_partials(self, x, u):
         """
         Given a system state (x) and a control input (u),
-        compute the next state 
+        compute the first-order partial derivitives of the dynamics
 
             x_next = f(x,u)
-
-        along with the partial derivitives
-
             fx = partial f(x,u) / partial x
             fu = partial f(x,u) / partial u
-
+        
         Args:   
             x:  An (n,) numpy array representing the state
             u:  An (m,) numpy array representing the control input
 
         Returns:
-            x_next: An (n,) numpy array representing the next state
             fx:     A (n,n) numpy array representing the partial derivative 
                     of f with respect to x.
             fu:     A (n,m) numpy array representing the partial derivative 
@@ -254,7 +250,63 @@ class IterativeLinearQuadraticRegulator():
         fx = G[:,:self.n]
         fu = G[:,self.n:]
 
-        return (ExtractValue(x_next).flatten(), fx, fu)
+        return (fx, fu)
+
+    def _linesearch(self, L_last):
+        """
+        Determine a value of eps in (0,1] that results in a suitably
+        reduced cost, based on forward simulations of the system. 
+
+        This involves simulating the system according to the control law
+
+            u = u_bar - eps*kappa - K*(x-x_bar).
+
+        and reducing eps by a factor of beta until the improvement in
+        total cost is greater than gamma*(expected cost reduction)
+
+        Args:
+            L_last: Total cost from the last iteration.
+
+        Returns:
+            eps:        Linesearch parameter
+            x:          (n,N) numpy array of new states
+            u:          (m,N-1) numpy array of new control inputs
+            L:          Total cost/loss associated with the new trajectory
+            n_iters:    Number of linesearch iterations taken
+
+        Raises:
+            RuntimeError: if eps has been reduced to <1e-8 and we still
+                           haven't found a suitable parameter.
+        """
+        eps = 1.0
+        n_iters = 0
+        while eps >= 1e-8:
+            n_iters += 1
+
+            # Simulate system forward using the given eps value
+            L = 0
+            expected_improvement = 0
+            x = np.zeros((self.n,self.N))
+            u = np.zeros((self.m,self.N-1))
+
+            x[:,0] = self.x0
+            for t in range(0,self.N-1):
+                u[:,t] = self.u_bar[:,t] - eps*self.kappa[:,t] - self.K[:,:,t]@(x[:,t] - self.x_bar[:,t])
+                x[:,t+1] = self._calc_dynamics(x[:,t], u[:,t])
+
+                L += (x[:,t]-self.x_nom).T@self.Q@(x[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
+                expected_improvement += -eps*(1-eps/2)*self.dV_coeff[t]
+            L += (x[:,-1]-self.x_nom).T@self.Qf@(x[:,-1]-self.x_nom)
+
+            # Chech whether the improvement is sufficient
+            improvement = L_last - L
+            if improvement > self.gamma*expected_improvement:
+                return eps, x, u, L, n_iters
+
+            # Otherwise reduce eps by a factor of beta
+            eps *= self.beta
+
+        raise RuntimeError("linesearch failed after %s iterations"%n_iters)
     
     def _forward_pass(self, L_last):
         """
@@ -276,80 +328,23 @@ class IterativeLinearQuadraticRegulator():
             fu:     Dynamics gradient w.r.t. u
 
         Returns:
-            L:      Total cost associated with this iteration
-            eps:    Linesearch parameter used
+            L:          Total cost associated with this iteration
+            eps:        Linesearch parameter used
+            ls_iters:   Number of linesearch iterations
         """
-        eps = 1.0
-        L, dV, x, u, fx, fu = self._forward_pass_helper(eps)
-        while L >= L_last + self.gamma*dV:
-            # Reduce eps until we get an improvement in the total cost
-            eps *= self.beta
-            L, dV, x, u, fx, fu = self._forward_pass_helper(eps)
+        # Do linesearch to determine eps
+        eps, x, u, L, ls_iters = self._linesearch(L_last)
+
+        # Compute the first-order dynamics derivatives
+        for t in range(0,self.N-1):
+            self.fx[:,:,t], self.fu[:,:,t] = self._calc_dynamics_partials(x[:,t], u[:,t])
 
         # Update stored values
         self.u_bar = u
         self.x_bar = x
-        self.fx = fx
-        self.fu = fu
 
-        return L, eps
+        return L, eps, ls_iters
     
-    def _forward_pass_helper(self, eps):
-        """
-        Simulate the system forward in time using the local feedback
-        control law
-
-            u = u_bar - eps*kappa - K*(x-x_bar)
-
-        for the given linesearch parameter eps.
-
-        Args:
-            eps:    Linesearch parameter in (0,1]
-
-        Return:
-            L:  Total cost associated with this rollout
-            dV: Expected change in total cost
-            x:  State trajectory associated with this rollout
-            u:  Control sequence associated with this rollout
-            fx: Dynamics gradient w.r.t x for this rollout
-            fu: Dynamics gradient w.r.t u  for this rollout
-        """
-        L = 0
-        dV = 0
-        x = np.zeros((self.n,self.N))
-        u = np.zeros((self.m,self.N-1))
-        fx = np.zeros((self.n,self.n,self.N-1))
-        fu = np.zeros((self.n,self.m,self.N-1))
-
-        # Set initial state
-        x[:,0] = self.x0
-
-        # simulate forward
-        st = time.time()
-        for t in range(0,self.N-1):
-            u[:,t] = self.u_bar[:,t] - eps*self.kappa[:,t] - self.K[:,:,t]@(x[:,t] - self.x_bar[:,t])
-            x[:,t+1], fx[:,:,t], fu[:,:,t] = self._calc_dynamics_with_partials(x[:,t], u[:,t])
-
-            L += (x[:,t]-self.x_nom).T@self.Q@(x[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
-            dV += -eps*(1-eps/2)*self.dV_coeff[t]
-        et = time.time()-st
-        #print("forward pass w/ partials: ",et)
-
-        # DEBUG
-        #st = time.time()
-        #for t in range(0,self.N-1):
-        #    u[:,t] = self.u_bar[:,t] - eps*self.kappa[:,t] - self.K[:,:,t]@(x[:,t] - self.x_bar[:,t])
-        #    x[:,t+1] = self._calc_dynamics(x[:,t], u[:,t])
-
-        #    L += (x[:,t]-self.x_nom).T@self.Q@(x[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
-        #    dV += -eps*(1-eps/2)*self.dV_coeff[t]
-        #et = time.time()-st
-        #print("forward pass w/o partials: ",et)
-
-        L += (x[:,-1]-self.x_nom).T@self.Qf@(x[:,-1]-self.x_nom)
-
-        return (L, dV, x, u, fx, fu)
-
     def _backward_pass(self):
         """
         Compute a quadratic approximation of the optimal cost-to-go
@@ -412,9 +407,9 @@ class IterativeLinearQuadraticRegulator():
         improvement = np.inf
 
         # Print labels for debug info
-        print("----------------------------------------------------------------------")
-        print("|    iter    |    cost    |    eps    |    iter time    |    time    |")
-        print("----------------------------------------------------------------------")
+        print("---------------------------------------------------------------------------------")
+        print("|    iter    |    cost    |    eps    |    ls    |    iter time    |    time    |")
+        print("---------------------------------------------------------------------------------")
 
         # iteration counter
         i = 1
@@ -422,13 +417,13 @@ class IterativeLinearQuadraticRegulator():
         while improvement > self.delta:
             st_iter = time.time()
 
-            L_new, eps = self._forward_pass(L)
+            L_new, eps, ls_iters = self._forward_pass(L)
             self._backward_pass()
 
             iter_time = time.time() - st_iter
             total_time = time.time() - st
 
-            print(f"{i:^14}{L_new:11.4f}  {eps:^12.4f}     {iter_time:1.5f}          {total_time:4.2f}")
+            print(f"{i:^14}{L_new:11.4f}  {eps:^12.4f}{ls_iters:^11}     {iter_time:1.5f}          {total_time:4.2f}")
 
             improvement = L - L_new
             L = L_new
