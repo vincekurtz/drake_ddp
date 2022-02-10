@@ -15,9 +15,9 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 0.4
-dt = 1e-2
-playback_rate = 0.2
+T = 2.0
+dt = 5e-3
+playback_rate = 1.0
 
 # Some useful joint angle definitions
 q_home = np.array([0, np.pi/12, np.pi, 4.014-2*np.pi, 0, 0.9599, np.pi/2])
@@ -30,9 +30,9 @@ x0 = np.hstack([q_retract, np.zeros(7)])
 x_nom = np.hstack([q_home, np.zeros(7)])
 
 # Quadratic cost
-Q = 5*np.eye(14)
-R = 0.1*np.eye(7)
-Qf = 10*np.eye(14)
+Q = np.diag(np.hstack([2*np.ones(7),5*np.ones(7)]))
+R = 0.01*np.eye(7)
+Qf = np.diag(np.hstack([5*np.ones(7),1*np.ones(7)]))
 
 # Contact model parameters
 dissipation = 1.0              # controls "bounciness" of collisions: lower is bouncier
@@ -104,7 +104,8 @@ system_ = builder_.Build()
 
 # Set up the optimizer
 num_steps = int(T/dt)
-ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5)
+ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
+        beta=0.9, delta=1e-2, gamma=0)
 
 # Define the optimization problem
 ilqr.SetInitialState(x0)

@@ -20,20 +20,21 @@ dt = 1e-2
 playback_rate = 0.2
 
 # Initial state
-x0 = np.array([0,np.pi+0.2,0,0])
+x0 = np.array([0,np.pi+0.5,0.0,0])
 
 # Target state
 x_nom = np.array([0,np.pi,0,0])
 
 # Quadratic cost
-Q = np.diag([1,1,0.01,0.01])
+Q = np.diag([0.1,1,0.01,0.01])
 R = 0.001*np.eye(1)
-Qf = np.diag([100,100,10,10])
+Qf = np.diag([200,200,10,10])
 
 # Contact model parameters
 dissipation = 0.0              # controls "bounciness" of collisions: lower is bouncier
 hydroelastic_modulus = 2e6     # controls "squishiness" of collisions: lower is squishier
 resolution_hint = 0.05         # smaller means a finer mesh
+penetration_allowance = 0.008  # controls "softenss" of collisions for point contact model
 
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
 mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
@@ -54,6 +55,7 @@ def create_system_model(plant):
     ball_props = ProximityProperties()
     AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus, ball_props)
     if contact_model == ContactModel.kPoint:
+        plant.set_penetration_allowance(penetration_allowance)
         AddContactMaterial(friction=CoulombFriction(), properties=ball_props)
     else:
         AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=ball_props)
@@ -72,6 +74,7 @@ def create_system_model(plant):
     plant.WeldFrames(plant.world_frame(), wall_frame, X_W)
     
     plant.RegisterVisualGeometry(wall, RigidTransform(), Box(l,w,h), "wall_visual", orange)
+   
     
     wall_props = ProximityProperties()
     AddRigidHydroelasticProperties(wall_props)
@@ -105,9 +108,9 @@ diagram = builder.Build()
 diagram_context = diagram.CreateDefaultContext()
 plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
-####################################
-# Solve Trajectory Optimization
-####################################
+#####################################
+## Solve Trajectory Optimization
+#####################################
 
 # Create system model for the solver to use. This system model
 # has a single input port for the control and doesn't include
@@ -161,7 +164,7 @@ while True:
 #####################################
 ## Run Simulation
 #####################################
-#
+
 ## Fix zero input for now
 #plant.get_actuation_input_port().FixValue(plant_context, 0)
 #
@@ -170,6 +173,6 @@ while True:
 #
 ## Simulate the system
 #simulator = Simulator(diagram, diagram_context)
-#simulator.set_target_realtime_rate(1.0)
+#simulator.set_target_realtime_rate(playback_rate)
 #
 #simulator.AdvanceTo(T)
