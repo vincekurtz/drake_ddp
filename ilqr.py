@@ -336,15 +336,15 @@ class IterativeLinearQuadraticRegulator():
         print("forward pass w/ partials: ",et)
 
         # DEBUG
-        st = time.time()
-        for t in range(0,self.N-1):
-            u[:,t] = self.u_bar[:,t] - eps*self.kappa[:,t] - self.K[:,:,t]@(x[:,t] - self.x_bar[:,t])
-            x[:,t+1] = self._calc_dynamics(x[:,t], u[:,t])
+        #st = time.time()
+        #for t in range(0,self.N-1):
+        #    u[:,t] = self.u_bar[:,t] - eps*self.kappa[:,t] - self.K[:,:,t]@(x[:,t] - self.x_bar[:,t])
+        #    x[:,t+1] = self._calc_dynamics(x[:,t], u[:,t])
 
-            L += (x[:,t]-self.x_nom).T@self.Q@(x[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
-            dV += -eps*(1-eps/2)*self.dV_coeff[t]
-        et = time.time()-st
-        print("forward pass w/o partials: ",et)
+        #    L += (x[:,t]-self.x_nom).T@self.Q@(x[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
+        #    dV += -eps*(1-eps/2)*self.dV_coeff[t]
+        #et = time.time()-st
+        #print("forward pass w/o partials: ",et)
 
         L += (x[:,-1]-self.x_nom).T@self.Qf@(x[:,-1]-self.x_nom)
 

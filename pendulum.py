@@ -72,14 +72,14 @@ plant_context = diagram.GetMutableSubsystemContext(
 # Create system model for the solver to use. This system model
 # has a single input port for the control and doesn't include
 # any visualizer stuff. 
-#builder_ = DiagramBuilder()
-#plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
-#plant_ = create_system_model(plant_)
-#builder_.ExportInput(plant_.get_actuation_input_port(), "control")
-#system_ = builder_.Build()
-
-plant_ = MultibodyPlant(dt)
+builder_ = DiagramBuilder()
+plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
 plant_ = create_system_model(plant_)
+builder_.ExportInput(plant_.get_actuation_input_port(), "control")
+system_ = builder_.Build()
+
+#plant_ = MultibodyPlant(dt)
+#plant_ = create_system_model(plant_)
 
 #-----------------------------------------
 # DDP method
@@ -89,8 +89,7 @@ if method == "ilqr":
     # Set up the optimizer
     num_steps = int(T/dt)
     
-    input_port = plant_.get_actuation_input_port().get_index()
-    ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, input_port=input_port)
+    ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, input_port=0)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)

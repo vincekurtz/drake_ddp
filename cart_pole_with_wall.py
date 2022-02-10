@@ -28,11 +28,11 @@ x_nom = np.array([0,np.pi,0,0])
 # Quadratic cost
 Q = np.diag([1,1,0.01,0.01])
 R = 0.001*np.eye(1)
-Qf = np.diag([200,100,10,10])
+Qf = np.diag([100,100,10,10])
 
 # Contact model parameters
 dissipation = 0.0              # controls "bounciness" of collisions: lower is bouncier
-hydroelastic_modulus = 2e7     # controls "squishiness" of collisions: lower is squishier
+hydroelastic_modulus = 2e5     # controls "squishiness" of collisions: lower is squishier
 resolution_hint = 0.05         # smaller means a finer mesh
 
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
@@ -109,21 +109,18 @@ plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 # Solve Trajectory Optimization
 ####################################
 
-# Create a system model (w/o visualizer) to do the optimization over
+# Create system model for the solver to use. This system model
+# has a single input port for the control and doesn't include
+# any visualizer stuff. 
 builder_ = DiagramBuilder()
 plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
 plant_ = create_system_model(plant_)
-diagram_ = builder_.Build()
-
-# Convert this system model to AutoDiff type
-diagram_ = diagram_.ToAutoDiffXd()
-diagram_context_ = diagram_.CreateDefaultContext()
-plant_ = diagram_.GetSubsystemByName("plant")
-plant_context_ = diagram_.GetMutableSubsystemContext(plant_, diagram_context_)
+builder_.ExportInput(plant_.get_actuation_input_port(), "control")
+system_ = builder_.Build()
 
 # Set up the optimizer
 num_steps = int(T/dt)
-ilqr = IterativeLinearQuadraticRegulator(plant_, plant_context_, num_steps, beta=0.8)
+ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.8)
 
 # Define the optimization problem
 ilqr.SetInitialState(x0)
