@@ -75,7 +75,6 @@ def create_system_model(plant):
     
     plant.RegisterVisualGeometry(wall, RigidTransform(), Box(l,w,h), "wall_visual", orange)
    
-    
     wall_props = ProximityProperties()
     AddRigidHydroelasticProperties(wall_props)
     if contact_model == ContactModel.kPoint:
