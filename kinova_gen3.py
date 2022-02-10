@@ -15,7 +15,7 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 0.2
+T = 0.5
 dt = 1e-2
 playback_rate = 0.2
 
@@ -39,7 +39,7 @@ Qv_robot = 1.0*np.ones(7)
 Qq_ball = np.array([0,0,0,0,100,100,100])
 Qv_ball = np.ones(6)
 Q_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, Qv_ball])
-Qf_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, Qv_ball])
+Qf_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, 5*Qv_ball])
 
 Q = np.diag(Q_diag)
 R = 0.01*np.eye(7)
@@ -47,11 +47,11 @@ Qf = np.diag(Qf_diag)
 
 # Contact model parameters
 dissipation = 1.0              # controls "bounciness" of collisions: lower is bouncier
-hydroelastic_modulus = 2e7     # controls "squishiness" of collisions: lower is squishier
+hydroelastic_modulus = 2e6     # controls "squishiness" of collisions: lower is squishier
 resolution_hint = 0.05         # smaller means a finer mesh
 
 contact_model = ContactModel.kHydroelasticWithFallback  # Hydroelastic, Point, or HydroelasticWithFallback
-mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
+mesh_type = HydroelasticContactRepresentation.kTriangle  # Triangle or Polygon
 
 ####################################
 # Tools for system setup
@@ -140,13 +140,14 @@ ilqr.SetTargetState(x_nom)
 ilqr.SetRunningCost(dt*Q, dt*R)
 ilqr.SetTerminalCost(Qf)
 
-# Set initial guess (gravity compensation)
+# Set initial guess
 plant.SetPositionsAndVelocities(plant_context, x0)
 tau_g = -plant.CalcGravityGeneralizedForces(plant_context)
 S = plant.MakeActuationMatrix().T
-u_guess = S@np.repeat(tau_g[np.newaxis].T, num_steps-1, axis=1)
+u_gravity_comp = S@np.repeat(tau_g[np.newaxis].T, num_steps-1, axis=1)
 
-u_guess = np.zeros((plant.num_actuators(),num_steps-1))
+#u_guess = np.zeros((plant.num_actuators(),num_steps-1))
+u_guess = 0.9*u_gravity_comp
 ilqr.SetInitialGuess(u_guess)
 
 # Solve the optimization problem
