@@ -69,17 +69,10 @@ plant_context = diagram.GetMutableSubsystemContext(
 # Solve Trajectory Optimization
 #####################################
 
-# Create system model for the solver to use. This system model
-# has a single input port for the control and doesn't include
-# any visualizer stuff. 
-builder_ = DiagramBuilder()
-plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
+# Create system model for the solver to use
+plant_ = MultibodyPlant(dt)
 plant_ = create_system_model(plant_)
-builder_.ExportInput(plant_.get_actuation_input_port(), "control")
-system_ = builder_.Build()
-
-#plant_ = MultibodyPlant(dt)
-#plant_ = create_system_model(plant_)
+input_port = plant_.get_actuation_input_port().get_index()
 
 #-----------------------------------------
 # DDP method
@@ -88,8 +81,7 @@ system_ = builder_.Build()
 if method == "ilqr":
     # Set up the optimizer
     num_steps = int(T/dt)
-    
-    ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, input_port=0)
+    ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, input_port=input_port)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)
@@ -113,11 +105,11 @@ if method == "ilqr":
 #-----------------------------------------
 
 elif method == "sqp":
-    system_context_ = system_.CreateDefaultContext()
+    context_ = plant_.CreateDefaultContext()
 
     # Set up the solver object
     trajopt = DirectTranscription(
-            system_, system_context_, 
+            plant_, plant_context_, 
             num_time_samples=int(T/dt))
     
     # Add constraints
