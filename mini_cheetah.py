@@ -15,7 +15,7 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 0.5
+T = 0.3
 dt = 1e-2
 playback_rate = 0.2
 
@@ -35,8 +35,8 @@ x0 = np.hstack([q0, np.zeros(18)])
 
 # Target state
 x_nom = np.hstack([q0, np.zeros(18)])
-x_nom[4] += 0.50  # base x position
-x_nom[5] += 0.00  # base y position
+x_nom[4] += 0.20  # base x position
+x_nom[5] += 0.10  # base y position
 x_nom[6] += 0.00  # base z position
 
 # Quadratic cost
@@ -54,8 +54,9 @@ Qf = np.diag(np.hstack([5*Qq_base,Qq_legs,Qv_base,Qv_legs]))
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
 mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 
-mu_static = 0.5
-mu_dynamic = 0.5
+dissipation = 0
+mu_static = 0.05
+mu_dynamic = 0.02
 
 ####################################
 # Tools for system setup
@@ -63,15 +64,16 @@ mu_dynamic = 0.5
 
 def create_system_model(plant):
 
-    # Add the kinova arm model from urdf (compliant hydroelastic contact included)
+    # Add the kinova arm model from urdf (rigid hydroelastic contact included)
     urdf = "models/mini_cheetah/mini_cheetah_mesh.urdf"
     arm = Parser(plant).AddModelFromFile(urdf)
 
-    # Add a ground with rigid hydroelastic contact
+    # Add a ground with compliant hydroelastic contact
     ground_props = ProximityProperties()
-    AddRigidHydroelasticProperties(ground_props)
+    #AddRigidHydroelasticProperties(ground_props)
+    AddCompliantHydroelasticPropertiesForHalfSpace(0.5,1e8,ground_props)
     friction = CoulombFriction(mu_static, mu_dynamic)
-    AddContactMaterial(friction=friction, properties=ground_props)
+    AddContactMaterial(dissipation=dissipation, friction=friction, properties=ground_props)
     plant.RegisterCollisionGeometry(plant.world_body(), RigidTransform(),
             HalfSpace(), "ground_collision", ground_props)
 
