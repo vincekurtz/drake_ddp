@@ -54,7 +54,7 @@ Qf = np.diag(np.hstack([5*Qq_base,Qq_legs,Qv_base,Qv_legs]))
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
 mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 
-dissipation = 0
+dissipation = 5
 mu_static = 0.5
 mu_dynamic = 0.2
 
@@ -71,7 +71,7 @@ def create_system_model(plant):
     # Add a ground with compliant hydroelastic contact
     ground_props = ProximityProperties()
     #AddRigidHydroelasticProperties(ground_props)
-    AddCompliantHydroelasticPropertiesForHalfSpace(0.5,1e8,ground_props)
+    AddCompliantHydroelasticPropertiesForHalfSpace(0.5,5e5,ground_props)
     friction = CoulombFriction(mu_static, mu_dynamic)
     AddContactMaterial(dissipation=dissipation, friction=friction, properties=ground_props)
     plant.RegisterCollisionGeometry(plant.world_body(), RigidTransform(),
