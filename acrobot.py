@@ -21,6 +21,7 @@ dt = 1e-2      # simulation timestep
 # Solver method
 # must be "ilqr" or "sqp"
 method = "ilqr"
+MPC = True      # MPC only works with ilqr for now
 
 # Initial state
 x0 = np.array([0,0,0,0])
@@ -77,6 +78,18 @@ input_port_index = plant_.get_actuation_input_port().get_index()
 # DDP method
 #-----------------------------------------
 
+def solve_ilqr(solver, x0, u_guess):
+    """
+    Convienience function for solving the optimization
+    problem from the given initial state with the given
+    guess of control inputs.
+    """
+    solver.SetInitialState(x0)
+    solver.SetInitialGuess(u_guess)
+
+    states, inputs, solve_time, optimal_cost = solver.Solve()
+    return states, inputs, solve_time, optimal_cost
+
 if method == "ilqr":
     # Set up optimizer
     num_steps = int(T/dt)
@@ -84,22 +97,52 @@ if method == "ilqr":
             input_port_index=input_port_index,
             beta=0.5)
 
-    # Define initial and target states
-    ilqr.SetInitialState(x0)
+    # Define the problem
     ilqr.SetTargetState(x_nom)
-
-    # Define cost function
     ilqr.SetRunningCost(dt*Q, dt*R)
     ilqr.SetTerminalCost(Qf)
 
     # Set initial guess
     u_guess = np.zeros((1,num_steps-1))
-    ilqr.SetInitialGuess(u_guess)
 
-    states, inputs, solve_time, optimal_cost = ilqr.Solve()
-    print(f"Solved in {solve_time} seconds using iLQR")
-    print(f"Optimal cost: {optimal_cost}")
-    timesteps = np.arange(0.0,T,dt)
+
+    if MPC:
+        # MPC parameters
+        num_resolves = 50    # total number of times to resolve the optimizaiton problem
+        replan_steps = 2     # number of timesteps after which to move the horizon and
+                             # re-solve the MPC problem (>0)
+        total_num_steps = num_steps + replan_steps*num_resolves
+        total_T = total_num_steps*dt
+
+        states = np.zeros((4,total_num_steps))
+
+        # Solve to get an initial trajectory
+        x, u, _, _ = solve_ilqr(ilqr, x0, u_guess)
+        states[:,0:num_steps] = x
+
+        for i in range(num_resolves+1):
+            # Set new state and control input
+            last_u = u[:,-1]
+            u_guess = np.block([
+                u[:,replan_steps:],    # keep same control inputs from last optimal sol'n
+                np.repeat(last_u[np.newaxis].T,replan_steps,axis=1)  # for new timesteps copy
+                ])                                                   # the last known control input
+            x0 = x[:,replan_steps]
+
+            # Resolve the optimization
+            x, u, _, _ = solve_ilqr(ilqr, x0, u_guess)
+
+            # Save the result for playback
+            start_idx = i*replan_steps
+            end_idx = start_idx + num_steps
+            states[:,start_idx:end_idx] = x
+
+        timesteps = np.arange(0.0,total_T,dt)
+    else:
+        states, inputs, solve_time, optimal_cost = solve_ilqr(ilqr, x0, u_guess)
+        print(f"Solved in {solve_time} seconds using iLQR")
+        print(f"Optimal cost: {optimal_cost}")
+        timesteps = np.arange(0.0,T,dt)
 
 #-----------------------------------------
 # Direct Transcription method
@@ -146,15 +189,25 @@ else:
 # Playback
 #####################################
 
-while True:
-    # Just keep playing back the trajectory
-    for i in range(len(timesteps)):
-        t = timesteps[i]
-        x = states[:,i]
+def playback(states, timesteps):
+    """
+    Convienience function for visualising the given trajectory.
 
-        diagram_context.SetTime(t)
-        plant.SetPositionsAndVelocities(plant_context, x)
-        diagram.Publish(diagram_context)
+    Relies on diagram, diagram_context, plant, and plant_context
+    being defined outside of the scope of this function and connected
+    to the Drake visualizer.
+    """
+    while True:
+        # Just keep playing back the trajectory
+        for i in range(len(timesteps)):
+            t = timesteps[i]
+            x = states[:,i]
 
-        time.sleep(dt-3e-4)
-    time.sleep(1)
+            diagram_context.SetTime(t)
+            plant.SetPositionsAndVelocities(plant_context, x)
+            diagram.Publish(diagram_context)
+
+            time.sleep(dt-3e-4)
+        time.sleep(1)
+
+playback(states,timesteps)
