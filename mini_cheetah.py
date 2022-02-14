@@ -50,7 +50,7 @@ Qq_base = np.ones(7)
 #Qq_base[4] = 0
 Qv_base = np.ones(6)
 
-Qq_legs = 0.0*np.ones(12)
+Qq_legs = 0.01*np.ones(12)
 Qv_legs = 0.01*np.ones(12)
 
 Q = np.diag(np.hstack([Qq_base,Qq_legs,0.01*Qv_base,Qv_legs]))
@@ -178,6 +178,13 @@ for i in range(num_resolves):
     start_idx = (i+1)*replan_steps
     end_idx = start_idx + num_steps
     states[:,start_idx:end_idx] = x
+
+    # Update the visualizer so we have a general sense of what
+    # the optimizer is doing
+    diagram_context.SetTime(end_idx*dt)
+    plant.SetPositionsAndVelocities(plant_context, x[:,-1])
+    diagram.Publish(diagram_context)
+    
 
 solve_time = time.time() - st
 print(f"Solved in {solve_time} seconds using iLQR")
