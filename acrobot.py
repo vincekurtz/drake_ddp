@@ -120,7 +120,7 @@ if method == "ilqr":
         x, u, _, _ = solve_ilqr(ilqr, x0, u_guess)
         states[:,0:num_steps] = x
 
-        for i in range(num_resolves+1):
+        for i in range(num_resolves):
             # Set new state and control input
             last_u = u[:,-1]
             u_guess = np.block([
@@ -133,7 +133,7 @@ if method == "ilqr":
             x, u, _, _ = solve_ilqr(ilqr, x0, u_guess)
 
             # Save the result for playback
-            start_idx = i*replan_steps
+            start_idx = (i+1)*replan_steps
             end_idx = start_idx + num_steps
             states[:,start_idx:end_idx] = x
 

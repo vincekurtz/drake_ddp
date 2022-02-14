@@ -20,7 +20,7 @@ dt = 1e-2
 playback_rate = 0.2
 
 # MPC parameters
-num_resolves = 10    # total number of times to resolve the optimizaiton problem
+num_resolves = 0    # total number of times to resolve the optimizaiton problem
 replan_steps = 1     # number of timesteps after which to move the horizon and
                      # re-solve the MPC problem (>0)
 
@@ -49,7 +49,7 @@ x_nom[22] += 0.3  # base x velocity
 # Quadratic cost
 Qq_base = np.ones(7)
 Qq_base[4] = 0
-Qv_base = 1*np.ones(6)
+Qv_base = np.ones(6)
 
 Qq_legs = 0.0*np.ones(12)
 Qv_legs = 0.01*np.ones(12)
@@ -62,9 +62,12 @@ Qf = np.diag(np.hstack([Qq_base,Qq_legs,Qv_base,Qv_legs]))
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
 mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 
-dissipation = 5
 mu_static = 0.5
 mu_dynamic = 0.2
+
+dissipation = 5
+slab_width = 0.5
+hydroelastic_modulus = 5e5
 
 ####################################
 # Tools for system setup
@@ -79,8 +82,6 @@ def create_system_model(plant):
     # Add a ground with compliant hydroelastic contact
     ground_props = ProximityProperties()
     #AddRigidHydroelasticProperties(ground_props)
-    slab_width = 0.5
-    hydroelastic_modulus = 5e5
     AddCompliantHydroelasticPropertiesForHalfSpace(slab_width,hydroelastic_modulus,ground_props)
     friction = CoulombFriction(mu_static, mu_dynamic)
     AddContactMaterial(dissipation=dissipation, friction=friction, properties=ground_props)
@@ -151,7 +152,8 @@ states = np.zeros((plant.num_multibody_states(),total_num_steps))
 x, u, _, _ = solve_ilqr(ilqr, x0, u_guess)
 states[:,0:num_steps] = x
 
-for i in range(num_resolves+1):
+for i in range(num_resolves):
+    print(f"\nRunning resolve {i+1}/{num_resolves}\n")
     # Set new state and control input
     last_u = u[:,-1]
     u_guess = np.block([
@@ -164,7 +166,7 @@ for i in range(num_resolves+1):
     x, u, _, _ = solve_ilqr(ilqr, x0, u_guess)
 
     # Save the result for playback
-    start_idx = i*replan_steps
+    start_idx = (i+1)*replan_steps
     end_idx = start_idx + num_steps
     states[:,start_idx:end_idx] = x
 
