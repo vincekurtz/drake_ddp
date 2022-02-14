@@ -15,13 +15,13 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 0.5
+T = 0.6
 dt = 1e-2
 playback_rate = 0.2
 
 # MPC parameters
-num_resolves = 0    # total number of times to resolve the optimizaiton problem
-replan_steps = 1     # number of timesteps after which to move the horizon and
+num_resolves = 0     # total number of times to resolve the optimizaiton problem
+replan_steps = 20    # number of timesteps after which to move the horizon and
                      # re-solve the MPC problem (>0)
 
 # Some useful definitions
@@ -56,7 +56,7 @@ Qv_legs = 0.01*np.ones(12)
 
 Q = np.diag(np.hstack([Qq_base,Qq_legs,Qv_base,Qv_legs]))
 R = 0.01*np.eye(12)
-Qf = np.diag(np.hstack([Qq_base,Qq_legs,Qv_base,Qv_legs]))
+Qf = np.diag(np.hstack([Qq_base,Qq_legs,2*Qv_base,Qv_legs]))
 
 # Contact model parameters
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback

@@ -292,7 +292,14 @@ class IterativeLinearQuadraticRegulator():
             x[:,0] = self.x0
             for t in range(0,self.N-1):
                 u[:,t] = self.u_bar[:,t] - eps*self.kappa[:,t] - self.K[:,:,t]@(x[:,t] - self.x_bar[:,t])
-                x[:,t+1] = self._calc_dynamics(x[:,t], u[:,t])
+                try:
+                    x[:,t+1] = self._calc_dynamics(x[:,t], u[:,t])
+                except RuntimeError as e:
+                    # If dynamics are infeasible, consider the loss to be infinite 
+                    # and stop simulating. This will lead to a reduction in eps
+                    print("Warning: encountered infeasible simulation in linesearch")
+                    L = np.inf
+                    break
 
                 L += (x[:,t]-self.x_nom).T@self.Q@(x[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
                 expected_improvement += -eps*(1-eps/2)*self.dV_coeff[t]
