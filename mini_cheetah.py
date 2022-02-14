@@ -15,13 +15,13 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 0.5
+T = 1.0
 dt = 1e-2
 playback_rate = 0.2
 
 # MPC parameters
-num_resolves = 5     # total number of times to resolve the optimizaiton problem
-replan_steps = 10    # number of timesteps after which to move the horizon and
+num_resolves = 0     # total number of times to resolve the optimizaiton problem
+replan_steps = 1     # number of timesteps after which to move the horizon and
                      # re-solve the MPC problem (>0)
 
 # Some useful definitions
@@ -39,12 +39,11 @@ u_stand = np.array([ 0.16370625,  0.42056475, -3.06492254,  0.16861717,  0.14882
 x0 = np.hstack([q0, np.zeros(18)])
 
 # Target state
-x_nom = np.hstack([q0, np.zeros(18)])
-x_nom[4] += 0.30  # base x position
-x_nom[5] += 0.00  # base y position
-x_nom[6] += 0.00  # base z position
+target_vel = 0.5   # m/s
 
-#x_nom[22] += 0.3  # base x velocity
+x_nom = np.hstack([q0, np.zeros(18)])
+x_nom[4] += target_vel*T  # base x position
+x_nom[22] += target_vel  # base x velocity
 
 # Quadratic cost
 Qq_base = np.ones(7)
@@ -62,12 +61,12 @@ Qf = np.diag(np.hstack([5*Qq_base,Qq_legs,Qv_base,Qv_legs]))
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
 mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 
-mu_static = 0.5
-mu_dynamic = 0.2
+mu_static = 0.6
+mu_dynamic = 0.5
 
-dissipation = 5
+dissipation = 0
 slab_width = 0.5
-hydroelastic_modulus = 5e5
+hydroelastic_modulus = 5e6
 
 ####################################
 # Tools for system setup
@@ -124,16 +123,24 @@ system_ = builder_.Build()
 
 # Helper function for solving the optimization problem from the
 # given initial state with the given guess of control inputs
-def solve_ilqr(solver, x0, u_guess):
+def solve_ilqr(solver, x0, u_guess, move_target=False):
     solver.SetInitialState(x0)
     solver.SetInitialGuess(u_guess)
+
+    if move_target:
+        # update target state consistent with desired
+        # velocity
+        delta_t = dt*replan_steps
+        x_nom[4] += target_vel*delta_t
+        solver.SetTargetState(x_nom)
+
     states, inputs, solve_time, optimal_cost = solver.Solve()
     return states, inputs, solve_time, optimal_cost
 
 # Set up the optimizer
 num_steps = int(T/dt)
 ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-        beta=0.5, delta=1e-2, gamma=0)
+        beta=0.5, delta=1e-3, gamma=0)
 
 # Define the optimization problem
 ilqr.SetTargetState(x_nom)
@@ -163,7 +170,7 @@ for i in range(num_resolves):
     x0 = x[:,replan_steps]
 
     # Resolve the optimization
-    x, u, _, _ = solve_ilqr(ilqr, x0, u_guess)
+    x, u, _, _ = solve_ilqr(ilqr, x0, u_guess, move_target=True)
 
     # Save the result for playback
     start_idx = (i+1)*replan_steps
