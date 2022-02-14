@@ -19,6 +19,11 @@ T = 0.5
 dt = 1e-2
 playback_rate = 0.2
 
+# MPC parameters
+num_resolves = 10    # total number of times to resolve the optimizaiton problem
+replan_steps = 1     # number of timesteps after which to move the horizon and
+                     # re-solve the MPC problem (>0)
+
 # Some useful definitions
 q0 = np.asarray([ 1.0, 0.0, 0.0, 0.0,     # base orientation
                   0.0, 0.0, 0.29,          # base position
@@ -39,7 +44,7 @@ x_nom[4] += 0.00  # base x position
 x_nom[5] += 0.00  # base y position
 x_nom[6] += 0.00  # base z position
 
-x_nom[22] += 0.5  # base x velocity
+x_nom[22] += 0.3  # base x velocity
 
 # Quadratic cost
 Qq_base = np.ones(7)
@@ -57,7 +62,7 @@ Qf = np.diag(np.hstack([Qq_base,Qq_legs,Qv_base,Qv_legs]))
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
 mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 
-dissipation = 4
+dissipation = 5
 mu_static = 0.5
 mu_dynamic = 0.2
 
@@ -74,7 +79,9 @@ def create_system_model(plant):
     # Add a ground with compliant hydroelastic contact
     ground_props = ProximityProperties()
     #AddRigidHydroelasticProperties(ground_props)
-    AddCompliantHydroelasticPropertiesForHalfSpace(0.5,5e5,ground_props)
+    slab_width = 0.5
+    hydroelastic_modulus = 5e5
+    AddCompliantHydroelasticPropertiesForHalfSpace(slab_width,hydroelastic_modulus,ground_props)
     friction = CoulombFriction(mu_static, mu_dynamic)
     AddContactMaterial(dissipation=dissipation, friction=friction, properties=ground_props)
     plant.RegisterCollisionGeometry(plant.world_body(), RigidTransform(),
@@ -106,6 +113,7 @@ plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 ##################################### 
 # Solve Trajectory Optimization 
 #################################### 
+
 # Create a system model (w/o visualizer) to do the optimization over 
 builder_ = DiagramBuilder() 
 plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
@@ -113,27 +121,56 @@ plant_ = create_system_model(plant_)
 builder_.ExportInput(plant_.get_actuation_input_port(), "control")
 system_ = builder_.Build()
 
+# Helper function for solving the optimization problem from the
+# given initial state with the given guess of control inputs
+def solve_ilqr(solver, x0, u_guess):
+    solver.SetInitialState(x0)
+    solver.SetInitialGuess(u_guess)
+    states, inputs, solve_time, optimal_cost = solver.Solve()
+    return states, inputs, solve_time, optimal_cost
+
 # Set up the optimizer
 num_steps = int(T/dt)
 ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
         beta=0.5, delta=1e-2, gamma=0)
 
 # Define the optimization problem
-ilqr.SetInitialState(x0)
 ilqr.SetTargetState(x_nom)
 ilqr.SetRunningCost(dt*Q, dt*R)
 ilqr.SetTerminalCost(Qf)
 
 # Set initial guess
-#u_guess = np.zeros((plant.num_actuators(),num_steps-1))
 u_guess = np.repeat(u_stand[np.newaxis].T,num_steps-1,axis=1)
-ilqr.SetInitialGuess(u_guess)
 
-# Solve the optimization problem
-states, inputs, solve_time, optimal_cost = ilqr.Solve()
-print(f"Solved in {solve_time} seconds using iLQR")
-print(f"Optimal cost: {optimal_cost}")
-timesteps = np.arange(0.0,T,dt)
+# MPC setup
+total_num_steps = num_steps + replan_steps*num_resolves
+total_T = total_num_steps*dt
+states = np.zeros((plant.num_multibody_states(),total_num_steps))
+
+# Solve to get an initial trajectory
+x, u, _, _ = solve_ilqr(ilqr, x0, u_guess)
+states[:,0:num_steps] = x
+
+for i in range(num_resolves+1):
+    # Set new state and control input
+    last_u = u[:,-1]
+    u_guess = np.block([
+        u[:,replan_steps:],    # keep same control inputs from last optimal sol'n
+        np.repeat(last_u[np.newaxis].T,replan_steps,axis=1)  # for new timesteps copy
+        ])                                                   # the last known control input
+    x0 = x[:,replan_steps]
+
+    # Resolve the optimization
+    x, u, _, _ = solve_ilqr(ilqr, x0, u_guess)
+
+    # Save the result for playback
+    start_idx = i*replan_steps
+    end_idx = start_idx + num_steps
+    states[:,start_idx:end_idx] = x
+
+#print(f"Solved in {solve_time} seconds using iLQR")
+#print(f"Optimal cost: {optimal_cost}")
+timesteps = np.arange(0.0,total_T,dt)
 
 #####################################
 # Playback
