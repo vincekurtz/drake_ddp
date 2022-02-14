@@ -15,13 +15,13 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 1.0
+T = 0.1
 dt = 1e-2
 playback_rate = 0.2
 
 # MPC parameters
-num_resolves = 0     # total number of times to resolve the optimizaiton problem
-replan_steps = 1     # number of timesteps after which to move the horizon and
+num_resolves = 50    # total number of times to resolve the optimizaiton problem
+replan_steps = 2     # number of timesteps after which to move the horizon and
                      # re-solve the MPC problem (>0)
 
 # Some useful definitions
@@ -156,9 +156,11 @@ total_T = total_num_steps*dt
 states = np.zeros((plant.num_multibody_states(),total_num_steps))
 
 # Solve to get an initial trajectory
+st = time.time()
 x, u, _, _ = solve_ilqr(ilqr, x0, u_guess)
 states[:,0:num_steps] = x
 
+# Perform additional resolves in MPC-fashion
 for i in range(num_resolves):
     print(f"\nRunning resolve {i+1}/{num_resolves}\n")
     # Set new state and control input
@@ -177,8 +179,8 @@ for i in range(num_resolves):
     end_idx = start_idx + num_steps
     states[:,start_idx:end_idx] = x
 
-#print(f"Solved in {solve_time} seconds using iLQR")
-#print(f"Optimal cost: {optimal_cost}")
+solve_time = time.time() - st
+print(f"Solved in {solve_time} seconds using iLQR")
 timesteps = np.arange(0.0,total_T,dt)
 
 #####################################

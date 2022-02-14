@@ -610,5 +610,12 @@
         <joint name="thigh_hr_to_knee_hr_j"/>
         <actuator name="thigh_hr_to_knee_hr_j_actuator"/>
     </transmission>
-
+    <!-- Ingore self-collisions for now -->
+    <drake:collision_filter_group name="feet">
+        <drake:member link="LF_FOOT"/>
+        <drake:member link="RF_FOOT"/>
+        <drake:member link="LH_FOOT"/>
+        <drake:member link="RH_FOOT"/>
+        <drake:ignored_collision_filter_group name="feet"/>
+    </drake:collision_filter_group>
 </robot>
