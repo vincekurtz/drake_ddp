@@ -18,11 +18,11 @@ from ilqr import IterativeLinearQuadraticRegulator
 T = 0.2
 dt = 1e-2
 playback_rate = 0.2
-target_vel = 0.5     # m/s
+target_vel = 1.00   # m/s
 
 # MPC parameters
-num_resolves = 40   # total number of times to resolve the optimizaiton problem
-replan_steps = 2    # number of timesteps after which to move the horizon and
+num_resolves = 50   # total number of times to resolve the optimizaiton problem
+replan_steps = 1    # number of timesteps after which to move the horizon and
                     # re-solve the MPC problem (>0)
 
 # Some useful definitions
@@ -142,7 +142,7 @@ def solve_ilqr(solver, x0, u_guess, move_target=False):
 # Set up the optimizer
 num_steps = int(T/dt)
 ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-        beta=0.5, delta=1e-2, gamma=0)
+        beta=0.5, delta=1e-3, gamma=0)
 
 # Define the optimization problem
 ilqr.SetTargetState(x_nom)
