@@ -54,15 +54,26 @@
             <geometry>
                 <cylinder length ="0.02" radius = "0.0475"/>
             </geometry>
+            <drake:proximity_properties>
+                <drake:compliant_hydroelastic/>
+                <drake:mesh_resolution_hint value="0.05"/>
+                <drake:hydroelastic_modulus value="1e5"/>
+                <drake:hunt_crossley_dissipation value="1.25"/>
+            </drake:proximity_properties>
             <origin rpy="0 1.5708 -1.5708" xyz="-0.055 0.0 0.0"/>
         </collision>
         <collision>
             <geometry>
                 <cylinder length ="0.06" radius = "0.0475"/>
             </geometry>
+            <drake:proximity_properties>
+                <drake:compliant_hydroelastic/>
+                <drake:mesh_resolution_hint value="0.05"/>
+                <drake:hydroelastic_modulus value="1e5"/>
+                <drake:hunt_crossley_dissipation value="1.25"/>
+            </drake:proximity_properties>
             <origin rpy="1.5708 0.0 0.0" xyz="0.0 0.0 0.0"/>
-        </collision>
-        -->
+        </collision>-->
     </link>
 
     <joint name="abduct_fl_to_thigh_fl_j" type="continuous">
@@ -90,9 +101,14 @@
             <geometry>
                 <cylinder length ="0.21" radius = "0.025"/>
             </geometry>
+            <drake:proximity_properties>
+                <drake:compliant_hydroelastic/>
+                <drake:mesh_resolution_hint value="0.05"/>
+                <drake:hydroelastic_modulus value="1e3"/>
+                <drake:hunt_crossley_dissipation value="1.25"/>
+            </drake:proximity_properties>
             <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.105"/>
-        </collision>
-        -->
+        </collision>-->
     </link>
 
     <joint name="thigh_fl_to_knee_fl_j" type="continuous">
@@ -193,9 +209,14 @@
             <geometry>
                 <cylinder length ="0.21" radius = "0.025"/>
             </geometry>
+            <drake:proximity_properties>
+                <drake:compliant_hydroelastic/>
+                <drake:mesh_resolution_hint value="0.05"/>
+                <drake:hydroelastic_modulus value="1e4"/>
+                <drake:hunt_crossley_dissipation value="1.25"/>
+            </drake:proximity_properties>
             <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.105"/>
-        </collision>
-        -->
+        </collision>-->
     </link>
 
     <joint name="thigh_fr_to_knee_fr_j" type="continuous">
@@ -297,8 +318,13 @@
                 <cylinder length ="0.21" radius = "0.025"/>
             </geometry>
             <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.105"/>
-        </collision>
-        -->
+            <drake:proximity_properties>
+                <drake:compliant_hydroelastic/>
+                <drake:mesh_resolution_hint value="0.05"/>
+                <drake:hydroelastic_modulus value="1e4"/>
+                <drake:hunt_crossley_dissipation value="1.25"/>
+            </drake:proximity_properties>
+        </collision>-->
     </link>
 
     <joint name="thigh_hl_to_knee_hl_j" type="continuous">
@@ -400,8 +426,13 @@
                 <cylinder length ="0.21" radius = "0.025"/>
             </geometry>
             <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.105"/>
-        </collision>
-        -->
+            <drake:proximity_properties>
+                <drake:compliant_hydroelastic/>
+                <drake:mesh_resolution_hint value="0.05"/>
+                <drake:hydroelastic_modulus value="1e4"/>
+                <drake:hunt_crossley_dissipation value="1.25"/>
+            </drake:proximity_properties>
+        </collision>-->
     </link>
 
     <joint name="thigh_hr_to_knee_hr_j" type="continuous">
@@ -609,12 +640,11 @@
         <actuator name="thigh_hr_to_knee_hr_j_actuator"/>
     </transmission>
     <!-- Ingore self-collisions for now -->
-    <drake:collision_filter_group name="all">
-        <drake:member link="body"/>
+    <drake:collision_filter_group name="feet">
         <drake:member link="LF_FOOT"/>
         <drake:member link="RF_FOOT"/>
         <drake:member link="LH_FOOT"/>
         <drake:member link="RH_FOOT"/>
-        <drake:ignored_collision_filter_group name="all"/>
+        <drake:ignored_collision_filter_group name="feet"/>
     </drake:collision_filter_group>
 </robot>

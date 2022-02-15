@@ -15,12 +15,13 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 0.5
+T = 0.2
 dt = 1e-2
 playback_rate = 0.2
+target_vel = 0.5     # m/s
 
 # MPC parameters
-num_resolves =  0   # total number of times to resolve the optimizaiton problem
+num_resolves = 40   # total number of times to resolve the optimizaiton problem
 replan_steps = 2    # number of timesteps after which to move the horizon and
                     # re-solve the MPC problem (>0)
 
@@ -39,8 +40,6 @@ u_stand = np.array([ 0.16370625,  0.42056475, -3.06492254,  0.16861717,  0.14882
 x0 = np.hstack([q0, np.zeros(18)])
 
 # Target state
-target_vel = 0.0   # m/s
-
 x_nom = np.hstack([q0, np.zeros(18)])
 x_nom[4] += target_vel*T  # base x position
 x_nom[22] += target_vel  # base x velocity
@@ -113,120 +112,119 @@ diagram = builder.Build()
 diagram_context = diagram.CreateDefaultContext()
 plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
-###################################### 
-## Solve Trajectory Optimization 
 ##################################### 
-#
-## Create a system model (w/o visualizer) to do the optimization over 
-#builder_ = DiagramBuilder() 
-#plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
-#plant_ = create_system_model(plant_)
-#builder_.ExportInput(plant_.get_actuation_input_port(), "control")
-#system_ = builder_.Build()
-#
-## Helper function for solving the optimization problem from the
-## given initial state with the given guess of control inputs
-#def solve_ilqr(solver, x0, u_guess, move_target=False):
-#    solver.SetInitialState(x0)
-#    solver.SetInitialGuess(u_guess)
-#
-#    if move_target:
-#        # update target state consistent with desired
-#        # velocity
-#        delta_t = dt*replan_steps
-#        x_nom[4] += target_vel*delta_t
-#        solver.SetTargetState(x_nom)
-#
-#    states, inputs, solve_time, optimal_cost = solver.Solve()
-#    return states, inputs, solve_time, optimal_cost
-#
-## Set up the optimizer
-#num_steps = int(T/dt)
-#ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-#        beta=0.5, delta=1e-2, gamma=0)
-#
-## Define the optimization problem
-#ilqr.SetTargetState(x_nom)
-#ilqr.SetRunningCost(dt*Q, dt*R)
-#ilqr.SetTerminalCost(Qf)
-#
-## Set initial guess
-#u_guess = 0*np.repeat(u_stand[np.newaxis].T,num_steps-1,axis=1)
-#
-## MPC setup
-#total_num_steps = num_steps + replan_steps*num_resolves
-#total_T = total_num_steps*dt
-#states = np.zeros((plant.num_multibody_states(),total_num_steps))
-#
-## Solve to get an initial trajectory
-#st = time.time()
-#x, u, _, _ = solve_ilqr(ilqr, x0, u_guess)
-#states[:,0:num_steps] = x
-#
-## Perform additional resolves in MPC-fashion
-#for i in range(num_resolves):
-#    print(f"\nRunning resolve {i+1}/{num_resolves}\n")
-#    # Set new state and control input
-#    last_u = u[:,-1]
-#    u_guess = np.block([
-#        u[:,replan_steps:],    # keep same control inputs from last optimal sol'n
-#        np.repeat(last_u[np.newaxis].T,replan_steps,axis=1)  # for new timesteps copy
-#        ])                                                   # the last known control input
-#    x0 = x[:,replan_steps]
-#
-#    # Resolve the optimization
-#    x, u, _, _ = solve_ilqr(ilqr, x0, u_guess, move_target=True)
-#
-#    # Save the result for playback
-#    start_idx = (i+1)*replan_steps
-#    end_idx = start_idx + num_steps
-#    states[:,start_idx:end_idx] = x
-#
-#    # Update the visualizer so we have a general sense of what
-#    # the optimizer is doing
-#    diagram_context.SetTime(end_idx*dt)
-#    plant.SetPositionsAndVelocities(plant_context, x[:,-1])
-#    diagram.Publish(diagram_context)
-#    
-#
-#solve_time = time.time() - st
-#print(f"Solved in {solve_time} seconds using iLQR")
-#timesteps = np.arange(0.0,total_T,dt)
-#
-######################################
-## Playback
-######################################
-#
-#while True:
-#    plant.get_actuation_input_port().FixValue(plant_context, 
-#            np.zeros(plant.num_actuators()))
-#    # Just keep playing back the trajectory
-#    for i in range(len(timesteps)):
-#        t = timesteps[i]
-#        x = states[:,i]
-#
-#        diagram_context.SetTime(t)
-#        plant.SetPositionsAndVelocities(plant_context, x)
-#        diagram.Publish(diagram_context)
-#
-#        time.sleep(1/playback_rate*dt-4e-4)
-#    time.sleep(1)
+# Solve Trajectory Optimization 
+#################################### 
 
+# Create a system model (w/o visualizer) to do the optimization over 
+builder_ = DiagramBuilder() 
+plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
+plant_ = create_system_model(plant_)
+builder_.ExportInput(plant_.get_actuation_input_port(), "control")
+system_ = builder_.Build()
 
-####################################
-# Run Simulation
-####################################
+# Helper function for solving the optimization problem from the
+# given initial state with the given guess of control inputs
+def solve_ilqr(solver, x0, u_guess, move_target=False):
+    solver.SetInitialState(x0)
+    solver.SetInitialGuess(u_guess)
 
-# Fix input
-plant.get_actuation_input_port().FixValue(plant_context, np.zeros(plant.num_actuators()))
-#plant.get_actuation_input_port().FixValue(plant_context, u_stand)
+    if move_target:
+        # update target state consistent with desired
+        # velocity
+        delta_t = dt*replan_steps
+        x_nom[4] += target_vel*delta_t
+        solver.SetTargetState(x_nom)
 
-# Set initial state
-plant.SetPositionsAndVelocities(plant_context, x0)
+    states, inputs, solve_time, optimal_cost = solver.Solve()
+    return states, inputs, solve_time, optimal_cost
 
-# Simulate the system
-simulator = Simulator(diagram, diagram_context)
-simulator.set_target_realtime_rate(playback_rate)
-simulator.set_publish_every_time_step(True)
+# Set up the optimizer
+num_steps = int(T/dt)
+ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
+        beta=0.5, delta=1e-2, gamma=0)
 
-simulator.AdvanceTo(T)
+# Define the optimization problem
+ilqr.SetTargetState(x_nom)
+ilqr.SetRunningCost(dt*Q, dt*R)
+ilqr.SetTerminalCost(Qf)
+
+# Set initial guess
+u_guess = np.repeat(u_stand[np.newaxis].T,num_steps-1,axis=1)
+
+# MPC setup
+total_num_steps = num_steps + replan_steps*num_resolves
+total_T = total_num_steps*dt
+states = np.zeros((plant.num_multibody_states(),total_num_steps))
+
+# Solve to get an initial trajectory
+st = time.time()
+x, u, _, _ = solve_ilqr(ilqr, x0, u_guess)
+states[:,0:num_steps] = x
+
+# Perform additional resolves in MPC-fashion
+for i in range(num_resolves):
+    print(f"\nRunning resolve {i+1}/{num_resolves}\n")
+    # Set new state and control input
+    last_u = u[:,-1]
+    u_guess = np.block([
+        u[:,replan_steps:],    # keep same control inputs from last optimal sol'n
+        np.repeat(last_u[np.newaxis].T,replan_steps,axis=1)  # for new timesteps copy
+        ])                                                   # the last known control input
+    x0 = x[:,replan_steps]
+
+    # Resolve the optimization
+    x, u, _, _ = solve_ilqr(ilqr, x0, u_guess, move_target=True)
+
+    # Save the result for playback
+    start_idx = (i+1)*replan_steps
+    end_idx = start_idx + num_steps
+    states[:,start_idx:end_idx] = x
+
+    # Update the visualizer so we have a general sense of what
+    # the optimizer is doing
+    diagram_context.SetTime(end_idx*dt)
+    plant.SetPositionsAndVelocities(plant_context, x[:,-1])
+    diagram.Publish(diagram_context)
+    
+
+solve_time = time.time() - st
+print(f"Solved in {solve_time} seconds using iLQR")
+timesteps = np.arange(0.0,total_T,dt)
+
+#####################################
+# Playback
+#####################################
+
+while True:
+    plant.get_actuation_input_port().FixValue(plant_context, 
+            np.zeros(plant.num_actuators()))
+    # Just keep playing back the trajectory
+    for i in range(len(timesteps)):
+        t = timesteps[i]
+        x = states[:,i]
+
+        diagram_context.SetTime(t)
+        plant.SetPositionsAndVelocities(plant_context, x)
+        diagram.Publish(diagram_context)
+
+        time.sleep(1/playback_rate*dt-4e-4)
+    time.sleep(1)
+
+#####################################
+## Run Simulation
+#####################################
+#
+## Fix input
+#plant.get_actuation_input_port().FixValue(plant_context, np.zeros(plant.num_actuators()))
+##plant.get_actuation_input_port().FixValue(plant_context, u_stand)
+#
+## Set initial state
+#plant.SetPositionsAndVelocities(plant_context, x0)
+#
+## Simulate the system
+#simulator = Simulator(diagram, diagram_context)
+#simulator.set_target_realtime_rate(playback_rate)
+#simulator.set_publish_every_time_step(True)
+#
+#simulator.AdvanceTo(T)
