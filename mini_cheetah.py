@@ -21,7 +21,7 @@ playback_rate = 0.2
 
 # MPC parameters
 num_resolves = 33   # total number of times to resolve the optimizaiton problem
-replan_steps = 1    # number of timesteps after which to move the horizon and
+replan_steps = 2    # number of timesteps after which to move the horizon and
                     # re-solve the MPC problem (>0)
 
 # Some useful definitions
@@ -39,7 +39,7 @@ u_stand = np.array([ 0.16370625,  0.42056475, -3.06492254,  0.16861717,  0.14882
 x0 = np.hstack([q0, np.zeros(18)])
 
 # Target state
-target_vel = 1.0   # m/s
+target_vel = 0.5   # m/s
 
 x_nom = np.hstack([q0, np.zeros(18)])
 x_nom[4] += target_vel*T  # base x position
@@ -50,18 +50,18 @@ Qq_base = np.ones(7)
 #Qq_base[4] = 0
 Qv_base = np.ones(6)
 
-Qq_legs = 0.01*np.ones(12)
+Qq_legs = 0.0*np.ones(12)
 Qv_legs = 0.01*np.ones(12)
 
 Q = np.diag(np.hstack([Qq_base,Qq_legs,0.01*Qv_base,Qv_legs]))
 R = 0.01*np.eye(12)
-Qf = np.diag(np.hstack([5*Qq_base,100*Qq_legs,Qv_base,Qv_legs]))
+Qf = np.diag(np.hstack([5*Qq_base,0.1+Qq_legs,Qv_base,Qv_legs]))
 
 # Contact model parameters
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
 mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 
-mu_static = 0.5
+mu_static = 0.6
 mu_dynamic = 0.5
 
 dissipation = 0
