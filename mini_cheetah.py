@@ -18,11 +18,11 @@ from ilqr import IterativeLinearQuadraticRegulator
 T = 0.2
 dt = 5e-3
 playback_rate = 0.2
-target_vel = 1.00   # m/s
+target_vel = 0.50   # m/s
 
 # MPC parameters
 num_resolves = 100  # total number of times to resolve the optimizaiton problem
-replan_steps = 2    # number of timesteps after which to move the horizon and
+replan_steps = 4    # number of timesteps after which to move the horizon and
                     # re-solve the MPC problem (>0)
 
 # Some useful definitions
