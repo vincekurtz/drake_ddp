@@ -35,9 +35,9 @@ x_nom = np.hstack([q_start, q_ball_target, np.zeros(13)])
 
 # Quadratic cost
 Qq_robot = 0.0*np.ones(7)
-Qv_robot = 1.0*np.ones(7)
+Qv_robot = 0.1*np.ones(7)
 Qq_ball = np.array([0,0,0,0,0,0,100])
-Qv_ball = 0.1*np.ones(6)
+Qv_ball = 0.01*np.ones(6)
 Q_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, Qv_ball])
 Qf_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, 10*Qv_ball])
 
@@ -151,7 +151,7 @@ S = plant.MakeActuationMatrix().T
 u_gravity_comp = S@np.repeat(tau_g[np.newaxis].T, num_steps-1, axis=1)
 
 #u_guess = np.zeros((plant.num_actuators(),num_steps-1))
-u_guess = 0.9*u_gravity_comp
+u_guess = u_gravity_comp
 ilqr.SetInitialGuess(u_guess)
 
 # Solve the optimization problem
