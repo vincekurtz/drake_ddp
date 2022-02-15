@@ -14,7 +14,6 @@
             </geometry>
             <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
         </visual>
-        <!--
         <collision>
             <geometry>
                 <box size="0.23 0.19 0.1"/>
@@ -27,7 +26,6 @@
             </drake:proximity_properties>
             <origin rpy="0 0 0" xyz="0 0 0"/>
         </collision>
-        -->
     </link>
 
     <!--!!!!!!!!!!!! Front Left Leg !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!-->
@@ -611,11 +609,12 @@
         <actuator name="thigh_hr_to_knee_hr_j_actuator"/>
     </transmission>
     <!-- Ingore self-collisions for now -->
-    <drake:collision_filter_group name="feet">
+    <drake:collision_filter_group name="all">
+        <drake:member link="body"/>
         <drake:member link="LF_FOOT"/>
         <drake:member link="RF_FOOT"/>
         <drake:member link="LH_FOOT"/>
         <drake:member link="RH_FOOT"/>
-        <drake:ignored_collision_filter_group name="feet"/>
+        <drake:ignored_collision_filter_group name="all"/>
     </drake:collision_filter_group>
 </robot>
