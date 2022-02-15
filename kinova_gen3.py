@@ -25,7 +25,7 @@ q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, n
 q_start = np.array([0.0, np.pi/4+0.15, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
 
 q_ball_start = np.array([0,0,0,1,0.5,0,0.1])
-q_ball_target = np.array([0,0,0,1,0.6,0.0,0.1])
+q_ball_target = np.array([0,0,0,1,1.0,0.0,0.1])
 
 # Initial state
 x0 = np.hstack([q_start, q_ball_start, np.zeros(13)])
@@ -37,9 +37,9 @@ x_nom = np.hstack([q_start, q_ball_target, np.zeros(13)])
 Qq_robot = 0.0*np.ones(7)
 Qv_robot = 1.0*np.ones(7)
 Qq_ball = np.array([0,0,0,0,100,100,100])
-Qv_ball = np.ones(6)
+Qv_ball = 0.1*np.ones(6)
 Q_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, Qv_ball])
-Qf_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, 5*Qv_ball])
+Qf_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, 10*Qv_ball])
 
 Q = np.diag(Q_diag)
 R = 0.01*np.eye(7)
@@ -49,6 +49,9 @@ Qf = np.diag(Qf_diag)
 dissipation = 1.0              # controls "bounciness" of collisions: lower is bouncier
 hydroelastic_modulus = 2e6     # controls "squishiness" of collisions: lower is squishier
 resolution_hint = 0.05         # smaller means a finer mesh
+
+mu_static = 0.6
+mu_dynamic = 0.5
 
 contact_model = ContactModel.kHydroelasticWithFallback  # Hydroelastic, Point, or HydroelasticWithFallback
 mesh_type = HydroelasticContactRepresentation.kTriangle  # Triangle or Polygon
@@ -73,7 +76,8 @@ def create_system_model(plant):
     ground_props = ProximityProperties()
     AddCompliantHydroelasticPropertiesForHalfSpace(1.0,hydroelastic_modulus,ground_props)
     #AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=ground_props)
-    AddContactMaterial(friction=CoulombFriction(), properties=ground_props)
+    friction = CoulombFriction(mu_static, mu_dynamic)
+    AddContactMaterial(friction=friction, properties=ground_props)
     plant.RegisterCollisionGeometry(plant.world_body(), RigidTransform(),
             HalfSpace(), "ground_collision", ground_props)
 
@@ -88,7 +92,7 @@ def create_system_model(plant):
     ball_props = ProximityProperties()
     AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus,ball_props)
     #AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=ball_props)
-    AddContactMaterial(friction=CoulombFriction(), properties=ball_props)
+    AddContactMaterial(friction=friction, properties=ball_props)
     plant.RegisterCollisionGeometry(ball, X_ball, Sphere(radius),
             "ball_collision", ball_props)
 
