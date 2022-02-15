@@ -18,7 +18,7 @@ from ilqr import IterativeLinearQuadraticRegulator
 T = 0.2
 dt = 5e-3
 playback_rate = 0.2
-target_vel = 0.50   # m/s
+target_vel = 1.00   # m/s
 
 # MPC parameters
 num_resolves = 100  # total number of times to resolve the optimizaiton problem
@@ -46,6 +46,7 @@ x_nom[22] += target_vel  # base x velocity
 
 # Quadratic cost
 Qq_base = np.ones(7)
+Qq_base[0:4] += 2
 Qv_base = np.ones(6)
 
 Qq_legs = 0.0*np.ones(12)
