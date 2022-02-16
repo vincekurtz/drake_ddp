@@ -15,16 +15,16 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 0.5
+T = 0.15
 dt = 1e-2
-playback_rate = 0.2
+playback_rate = 0.1
 
 # Some useful joint angle definitions
 q_home = np.array([0, np.pi/12, np.pi, 4.014-2*np.pi, 0, 0.9599, np.pi/2])
 q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, np.pi/2])
 q_start = np.array([0.0, np.pi/4+0.15, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
 
-q_ball_start = np.array([0,0,0,1,0.5,0,0.1])
+q_ball_start = np.array([0,0,0,1,0.75,0,0.1])
 q_ball_target = np.array([0,0,0,1,0.5,0.25,0.1])
 
 # Initial state
@@ -70,7 +70,13 @@ def create_system_model(plant):
                      plant.GetFrameByName("base_link", arm))
 
     # Add an unactuated gripper from urdf
-    # (rigid hydroelastic contact included)
+    urdf = "models/2f_85_gripper/urdf/robotiq_2f_85_static.urdf"
+    gripper = Parser(plant).AddModelFromFile(urdf)
+    X_grip = RigidTransform()
+    X_grip.set_rotation(RotationMatrix(RollPitchYaw([0,0,np.pi/2])))
+    plant.WeldFrames(plant.GetFrameByName("end_effector_link",arm),
+                     plant.GetFrameByName("robotiq_arg2f_base_link", gripper),
+                     X_grip)
 
     # Add a ground with compliant hydroelastic contact
     ground_props = ProximityProperties()
@@ -114,7 +120,8 @@ plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
 plant = create_system_model(plant)
 
 # Connect to visualizer
-DrakeVisualizer().AddToBuilder(builder, scene_graph)
+params = DrakeVisualizerParams(role=Role.kProximity, show_hydroelastic=True)
+DrakeVisualizer(params=params).AddToBuilder(builder, scene_graph)
 ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
 # Finailze the diagram
@@ -122,76 +129,76 @@ diagram = builder.Build()
 diagram_context = diagram.CreateDefaultContext()
 plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
-####################################
-# Solve Trajectory Optimization
-####################################
-
-# Create a system model (w/o visualizer) to do the optimization over
-builder_ = DiagramBuilder()
-plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
-plant_ = create_system_model(plant_)
-builder_.ExportInput(plant_.get_actuation_input_port(), "control")
-system_ = builder_.Build()
-
-# Set up the optimizer
-num_steps = int(T/dt)
-ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-        beta=0.9, delta=1e-2, gamma=0)
-
-# Define the optimization problem
-ilqr.SetInitialState(x0)
-ilqr.SetTargetState(x_nom)
-ilqr.SetRunningCost(dt*Q, dt*R)
-ilqr.SetTerminalCost(Qf)
-
-# Set initial guess
-plant.SetPositionsAndVelocities(plant_context, x0)
-tau_g = -plant.CalcGravityGeneralizedForces(plant_context)
-S = plant.MakeActuationMatrix().T
-u_gravity_comp = S@np.repeat(tau_g[np.newaxis].T, num_steps-1, axis=1)
-
-#u_guess = np.zeros((plant.num_actuators(),num_steps-1))
-u_guess = 0.9*u_gravity_comp
-ilqr.SetInitialGuess(u_guess)
-
-# Solve the optimization problem
-states, inputs, solve_time, optimal_cost = ilqr.Solve()
-print(f"Solved in {solve_time} seconds using iLQR")
-print(f"Optimal cost: {optimal_cost}")
-timesteps = np.arange(0.0,T,dt)
-
 #####################################
-# Playback
-#####################################
-
-while True:
-    plant.get_actuation_input_port().FixValue(plant_context, 
-            np.zeros(plant.num_actuators()))
-    # Just keep playing back the trajectory
-    for i in range(len(timesteps)):
-        t = timesteps[i]
-        x = states[:,i]
-
-        diagram_context.SetTime(t)
-        plant.SetPositionsAndVelocities(plant_context, x)
-        diagram.Publish(diagram_context)
-
-        time.sleep(1/playback_rate*dt-4e-4)
-    time.sleep(1)
-
-#####################################
-## Run Simulation
+## Solve Trajectory Optimization
 #####################################
 #
-## Fix zero input for now
-#plant.get_actuation_input_port().FixValue(plant_context, np.zeros(plant.num_actuators()))
+## Create a system model (w/o visualizer) to do the optimization over
+#builder_ = DiagramBuilder()
+#plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
+#plant_ = create_system_model(plant_)
+#builder_.ExportInput(plant_.get_actuation_input_port(), "control")
+#system_ = builder_.Build()
 #
-## Set initial state
+## Set up the optimizer
+#num_steps = int(T/dt)
+#ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
+#        beta=0.9, delta=1e-2, gamma=0)
+#
+## Define the optimization problem
+#ilqr.SetInitialState(x0)
+#ilqr.SetTargetState(x_nom)
+#ilqr.SetRunningCost(dt*Q, dt*R)
+#ilqr.SetTerminalCost(Qf)
+#
+## Set initial guess
 #plant.SetPositionsAndVelocities(plant_context, x0)
+#tau_g = -plant.CalcGravityGeneralizedForces(plant_context)
+#S = plant.MakeActuationMatrix().T
+#u_gravity_comp = S@np.repeat(tau_g[np.newaxis].T, num_steps-1, axis=1)
 #
-## Simulate the system
-#simulator = Simulator(diagram, diagram_context)
-#simulator.set_target_realtime_rate(playback_rate)
-#simulator.set_publish_every_time_step(True)
+##u_guess = np.zeros((plant.num_actuators(),num_steps-1))
+#u_guess = 0.9*u_gravity_comp
+#ilqr.SetInitialGuess(u_guess)
 #
-#simulator.AdvanceTo(T)
+## Solve the optimization problem
+#states, inputs, solve_time, optimal_cost = ilqr.Solve()
+#print(f"Solved in {solve_time} seconds using iLQR")
+#print(f"Optimal cost: {optimal_cost}")
+#timesteps = np.arange(0.0,T,dt)
+#
+######################################
+## Playback
+######################################
+#
+#while True:
+#    plant.get_actuation_input_port().FixValue(plant_context, 
+#            np.zeros(plant.num_actuators()))
+#    # Just keep playing back the trajectory
+#    for i in range(len(timesteps)):
+#        t = timesteps[i]
+#        x = states[:,i]
+#
+#        diagram_context.SetTime(t)
+#        plant.SetPositionsAndVelocities(plant_context, x)
+#        diagram.Publish(diagram_context)
+#
+#        time.sleep(1/playback_rate*dt-4e-4)
+#    time.sleep(1)
+
+####################################
+# Run Simulation
+####################################
+
+# Fix zero input for now
+plant.get_actuation_input_port().FixValue(plant_context, np.zeros(plant.num_actuators()))
+
+# Set initial state
+plant.SetPositionsAndVelocities(plant_context, x0)
+
+# Simulate the system
+simulator = Simulator(diagram, diagram_context)
+simulator.set_target_realtime_rate(playback_rate)
+simulator.set_publish_every_time_step(True)
+
+simulator.AdvanceTo(T)
