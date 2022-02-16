@@ -16,16 +16,16 @@ from ilqr import IterativeLinearQuadraticRegulator
 ####################################
 
 T = 0.5
-dt = 5e-3
+dt = 1e-2
 playback_rate = 0.2
 
 # Some useful joint angle definitions
 q_home = np.array([0, np.pi/12, np.pi, 4.014-2*np.pi, 0, 0.9599, np.pi/2])
 q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, np.pi/2])
-q_start = np.pi*np.array([0.25, 0.66,-0.39, 0.69, 0.2, 0.2, 0])
+q_start = np.array([0.0, np.pi/4+0.15, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
 
-q_ball_start = np.array([0,0,0,1,0.15,0.03,0.1])
-q_ball_target = np.array([0,0,0,1,0.15,0.02,0.3])
+q_ball_start = np.array([0,0,0,1,0.5,0,0.1])
+q_ball_target = np.array([0,0,0,1,0.5,0.25,0.1])
 
 # Initial state
 x0 = np.hstack([q_start, q_ball_start, np.zeros(13)])
@@ -35,9 +35,9 @@ x_nom = np.hstack([q_start, q_ball_target, np.zeros(13)])
 
 # Quadratic cost
 Qq_robot = 0.0*np.ones(7)
-Qv_robot = 0.1*np.ones(7)
-Qq_ball = np.array([0,0,0,0,0,0,100])
-Qv_ball = 0.01*np.ones(6)
+Qv_robot = 1.0*np.ones(7)
+Qq_ball = np.array([0,0,0,0,100,100,100])
+Qv_ball = 0.1*np.ones(6)
 Q_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, Qv_ball])
 Qf_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, 10*Qv_ball])
 
@@ -136,7 +136,7 @@ system_ = builder_.Build()
 # Set up the optimizer
 num_steps = int(T/dt)
 ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-        beta=0.9, delta=1e-3, gamma=0)
+        beta=0.9, delta=1e-2, gamma=0)
 
 # Define the optimization problem
 ilqr.SetInitialState(x0)
@@ -151,7 +151,7 @@ S = plant.MakeActuationMatrix().T
 u_gravity_comp = S@np.repeat(tau_g[np.newaxis].T, num_steps-1, axis=1)
 
 #u_guess = np.zeros((plant.num_actuators(),num_steps-1))
-u_guess = u_gravity_comp
+u_guess = 0.9*u_gravity_comp
 ilqr.SetInitialGuess(u_guess)
 
 # Solve the optimization problem
