@@ -15,7 +15,7 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 0.2
+T = 0.20
 dt = 1e-2
 playback_rate = 0.1
 
@@ -24,8 +24,8 @@ q_home = np.array([0, np.pi/12, np.pi, 4.014-2*np.pi, 0, 0.9599, np.pi/2])
 q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, np.pi/2])
 q_start = np.array([0.0, np.pi/4+0.15, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
 
-q_ball_start = np.array([0,0,0,1,0.5,0,0.1])
-q_ball_target = np.array([0,0,0,1,0.8,0.0,0.1])
+q_ball_start = np.array([0,0,0,1,0.7,0,0.1])
+q_ball_target = np.array([0,0,0,1,1.0,0.0,0.1])
 
 # Initial state
 x0 = np.hstack([q_start, q_ball_start, np.zeros(13)])
@@ -47,7 +47,7 @@ Qf = np.diag(Qf_diag)
 
 # Contact model parameters
 dissipation = 1.0              # controls "bounciness" of collisions: lower is bouncier
-hydroelastic_modulus = 2e6     # controls "squishiness" of collisions: lower is squishier
+hydroelastic_modulus = 5e6     # controls "squishiness" of collisions: lower is squishier
 resolution_hint = 0.05         # smaller means a finer mesh
 
 mu_static = 0.6
