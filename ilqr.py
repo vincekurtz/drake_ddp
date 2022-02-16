@@ -6,6 +6,7 @@
 
 from pydrake.all import *
 import time
+import pickle
 
 class IterativeLinearQuadraticRegulator():
     """
@@ -298,7 +299,7 @@ class IterativeLinearQuadraticRegulator():
                 except RuntimeError as e:
                     # If dynamics are infeasible, consider the loss to be infinite 
                     # and stop simulating. This will lead to a reduction in eps
-                    print("Warning: encountered infeasible simulation in linesearch:")
+                    print("Warning: encountered infeasible simulation in linesearch")
                     #print(e)
                     L = np.inf
                     break
@@ -439,3 +440,20 @@ class IterativeLinearQuadraticRegulator():
             i += 1
 
         return self.x_bar, self.u_bar, total_time, L
+
+    def SaveSolution(self, fname):
+        """
+        Save the stored solution, including target state x_bar
+        nominal control input u_bar, and feedback gains K in the given file,
+        where the feedback control
+
+            u = u_bar - K*(x-x_bar)
+
+        locally stabilizes the nominal trajectory.
+
+        Args:
+            fname:  pickle file to save the data to.
+        """
+        data = {"x_bar":self.x_bar, "u_bar":self.u_bar, "K":self.K}
+        with open(fname,'wb') as f:
+            pickle.dump(data, f)
