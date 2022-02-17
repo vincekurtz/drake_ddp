@@ -6,7 +6,7 @@
 
 from pydrake.all import *
 import time
-import pickle
+import numpy as np
 
 class IterativeLinearQuadraticRegulator():
     """
@@ -444,16 +444,22 @@ class IterativeLinearQuadraticRegulator():
     def SaveSolution(self, fname):
         """
         Save the stored solution, including target state x_bar
-        nominal control input u_bar, and feedback gains K in the given file,
-        where the feedback control
+        nominal control input u_bar, feedback gains K, and timesteps
+        t in the given file, where the feedback control
 
             u = u_bar - K*(x-x_bar)
 
         locally stabilizes the nominal trajectory.
 
         Args:
-            fname:  pickle file to save the data to.
+            fname:  npz file to save the data to.
         """
-        data = {"x_bar":self.x_bar, "u_bar":self.u_bar, "K":self.K}
-        with open(fname,'wb') as f:
-            pickle.dump(data, f)
+        dt = self.system.GetSubsystemByName("plant").time_step()
+        T = (self.N-1)*dt
+        t = np.arange(0,T,dt)
+
+        x_bar = self.x_bar[:,:-1]  # remove last timestep
+        u_bar = self.u_bar
+        K = self.K
+
+        np.savez(fname, t=t, x_bar=x_bar, u_bar=u_bar, K=K)

@@ -10,7 +10,6 @@
 import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
-import pickle
 
 # Choose what to do
 simulate = False   # Run a simple simulation with fixed input
@@ -19,13 +18,13 @@ playback = True    # Visualize the optimal trajectory by playing it back.
                    # If optimize=False, attempts to load a previously saved
                    # trajectory from a file.
 
-save_file = "kinova_gen3.pkl"
+save_file = "test.npz"
 
 ####################################
 # Parameters
 ####################################
 
-T = 0.20
+T = 0.10
 dt = 1e-2
 playback_rate = 1.0
 
@@ -221,9 +220,8 @@ if playback:
 
     if not optimize:
         # load previously computed solution from file
-        timesteps = np.arange(0.0,T,dt)
-        with open(save_file,"rb") as f:
-            data = pickle.load(f)
+        data = np.load(save_file)
+        timesteps = data["t"]
         states = data["x_bar"]
 
     while True:
