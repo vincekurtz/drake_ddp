@@ -13,7 +13,7 @@ from ilqr import IterativeLinearQuadraticRegulator
 
 # Choose what to do
 simulate = False   # Run a simple simulation with fixed input
-optimize = False   # Find an optimal trajectory using ilqr
+optimize = True    # Find an optimal trajectory using ilqr
 playback = True    # Visualize the optimal trajectory by playing it back.
                    # If optimize=False, attempts to load a previously saved
                    # trajectory from a file.
@@ -24,9 +24,9 @@ save_file = "test.npz"
 # Parameters
 ####################################
 
-T = 0.10
+T = 0.5
 dt = 1e-2
-playback_rate = 1.0
+playback_rate = 0.2
 
 # Some useful joint angle definitions
 q_home = np.array([0, np.pi/12, np.pi, 4.014-2*np.pi, 0, 0.9599, np.pi/2])
@@ -34,7 +34,7 @@ q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, n
 q_start = np.array([0.0, np.pi/4+0.15, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
 
 q_ball_start = np.array([0,0,0,1,0.7,0,0.1])
-q_ball_target = np.array([0,0,0,1,1.0,0.0,0.1])
+q_ball_target = np.array([0,0,0,1,0.9,0.0,0.1])
 
 # Initial state
 x0 = np.hstack([q_start, q_ball_start, np.zeros(13)])
@@ -44,7 +44,7 @@ x_nom = np.hstack([q_start, q_ball_target, np.zeros(13)])
 
 # Quadratic cost
 Qq_robot = 0.0*np.ones(7)
-Qv_robot = 1.0*np.ones(7)
+Qv_robot = 0.1*np.ones(7)
 Qq_ball = np.array([0,0,0,0,100,100,100])
 Qv_ball = 0.1*np.ones(6)
 Q_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, Qv_ball])
@@ -55,12 +55,12 @@ R = 0.01*np.eye(7)
 Qf = np.diag(Qf_diag)
 
 # Contact model parameters
-dissipation = 1.0              # controls "bounciness" of collisions: lower is bouncier
+dissipation = 3.0              # controls "bounciness" of collisions: lower is bouncier
 hydroelastic_modulus = 5e6     # controls "squishiness" of collisions: lower is squishier
 resolution_hint = 0.05         # smaller means a finer mesh
 
-mu_static = 0.6
-mu_dynamic = 0.5
+mu_static = 0.3
+mu_dynamic = 0.2
 
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
 mesh_type = HydroelasticContactRepresentation.kTriangle  # Triangle or Polygon
@@ -130,20 +130,19 @@ def create_system_model(plant, scene_graph):
 
     # Add a ball with compliant hydroelastic contact
     radius = 0.1
-    mass = 0.1
-    I = SpatialInertia(mass, np.zeros(3), UnitInertia.SolidSphere(radius))
+    mass = 0.258
+    I = SpatialInertia(mass, np.zeros(3), UnitInertia.HollowSphere(radius))
     ball_instance = plant.AddModelInstance("ball")
     ball = plant.AddRigidBody("ball",ball_instance, I)
     X_ball = RigidTransform()
 
     ball_props = ProximityProperties()
     AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus,ball_props)
-    #AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=ball_props)
-    AddContactMaterial(friction=friction, properties=ball_props)
+    AddContactMaterial(dissipation=dissipation, friction=friction, properties=ball_props)
     plant.RegisterCollisionGeometry(ball, X_ball, Sphere(radius),
             "ball_collision", ball_props)
 
-    color = np.array([1.0,0.55,0.0, 0.5])
+    color = np.array([0.8,1.0,0.0,0.5])
     plant.RegisterVisualGeometry(ball, X_ball, Sphere(radius), "ball_visual", color)
 
     # Choose contact model
