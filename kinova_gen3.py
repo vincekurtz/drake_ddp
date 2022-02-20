@@ -32,21 +32,21 @@ playback_rate = 1.0
 q_home = np.pi/180*np.array([0, 15, 180, 230, 0, 55, 90])
 q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, np.pi/2])
 q_push = np.array([0.0, np.pi/4+0.14, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
-q_wrap = np.pi/180*np.array([52, 122, 114, 244, 217, 57, 11])
+q_wrap = np.pi/180*np.array([52, 122, 114, 240, 217, 55, 11])
 
-q_ball_start = np.array([0,0,0,1,0.6,0,0.1])
-q_ball_target = np.array([0,0,0,1,0.6,0.1,0.1])
+q_ball_start = np.array([0,0,0,1,0.15,0,0.1])
+q_ball_target = np.array([0,0,0,1,0.15,0.0,0.3])
 
 # Initial state
-x0 = np.hstack([q_push, q_ball_start, np.zeros(13)])
+x0 = np.hstack([q_wrap, q_ball_start, np.zeros(13)])
 
 # Target state
-x_nom = np.hstack([q_push, q_ball_target, np.zeros(13)])
+x_nom = np.hstack([q_wrap, q_ball_target, np.zeros(13)])
 
 # Quadratic cost
 Qq_robot = 0.0*np.ones(7)
 Qv_robot = 0.1*np.ones(7)
-Qq_ball = 1*np.array([0,0,0,0,100,100,0])
+Qq_ball = 1*np.array([0,0,0,0,0,0,100])
 Qv_ball = 0.1*np.ones(6)
 Q_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, Qv_ball])
 Qf_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, 10*Qv_ball])
