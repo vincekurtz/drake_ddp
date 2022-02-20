@@ -26,26 +26,27 @@ save_file = "test.npz"
 
 T = 0.5
 dt = 1e-2
-playback_rate = 0.2
+playback_rate = 1.0
 
 # Some useful joint angle definitions
-q_home = np.array([0, np.pi/12, np.pi, 4.014-2*np.pi, 0, 0.9599, np.pi/2])
+q_home = np.pi/180*np.array([0, 15, 180, 230, 0, 55, 90])
 q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, np.pi/2])
-q_start = np.array([0.0, np.pi/4+0.15, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
+q_push = np.array([0.0, np.pi/4+0.14, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
+q_wrap = np.pi/180*np.array([52, 122, 114, 244, 217, 57, 11])
 
-q_ball_start = np.array([0,0,0,1,0.7,0,0.1])
-q_ball_target = np.array([0,0,0,1,0.9,0.0,0.1])
+q_ball_start = np.array([0,0,0,1,0.6,0,0.1])
+q_ball_target = np.array([0,0,0,1,0.6,0.1,0.1])
 
 # Initial state
-x0 = np.hstack([q_start, q_ball_start, np.zeros(13)])
+x0 = np.hstack([q_push, q_ball_start, np.zeros(13)])
 
 # Target state
-x_nom = np.hstack([q_start, q_ball_target, np.zeros(13)])
+x_nom = np.hstack([q_push, q_ball_target, np.zeros(13)])
 
 # Quadratic cost
 Qq_robot = 0.0*np.ones(7)
 Qv_robot = 0.1*np.ones(7)
-Qq_ball = np.array([0,0,0,0,100,100,100])
+Qq_ball = 1*np.array([0,0,0,0,100,100,0])
 Qv_ball = 0.1*np.ones(6)
 Q_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, Qv_ball])
 Qf_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, 10*Qv_ball])
@@ -184,7 +185,7 @@ if optimize:
     # Set up the optimizer
     num_steps = int(T/dt)
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-            beta=0.9, delta=1e-2, gamma=0)
+            beta=0.9, delta=1e-3, gamma=0)
 
     # Define the optimization problem
     ilqr.SetInitialState(x0)
@@ -199,7 +200,7 @@ if optimize:
     u_gravity_comp = S@np.repeat(tau_g[np.newaxis].T, num_steps-1, axis=1)
 
     #u_guess = np.zeros((plant.num_actuators(),num_steps-1))
-    u_guess = 0.9*u_gravity_comp
+    u_guess = u_gravity_comp
     ilqr.SetInitialGuess(u_guess)
 
     # Solve the optimization problem
