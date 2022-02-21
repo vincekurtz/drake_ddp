@@ -34,11 +34,12 @@ q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, n
 q_push = np.array([0.0, np.pi/4+0.14, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
 q_wrap = np.pi/180*np.array([52, 122, 114, 240, 217, 55, 11])
 
-q_ball_start = np.array([0,0,0,1,0.15,0,0.1])
-q_ball_target = np.array([0,0,0,1,0.15,0.0,0.3])
+radius = 0.107   # of ball
+q_ball_start = np.array([0,0,0,1,0.6,0,radius])
+q_ball_target = np.array([0,0,0,1,0.9,0.0,radius])
 
 # Initial state
-x0 = np.hstack([q_wrap, q_ball_start, np.zeros(13)])
+x0 = np.hstack([q_push, q_ball_start, np.zeros(13)])
 
 # Target state
 x_nom = np.hstack([q_wrap, q_ball_target, np.zeros(13)])
@@ -46,7 +47,7 @@ x_nom = np.hstack([q_wrap, q_ball_target, np.zeros(13)])
 # Quadratic cost
 Qq_robot = 0.0*np.ones(7)
 Qv_robot = 0.1*np.ones(7)
-Qq_ball = 1*np.array([0,0,0,0,0,0,100])
+Qq_ball = 1*np.array([0,0,0,0,100,100,100])
 Qv_ball = 0.1*np.ones(6)
 Q_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, Qv_ball])
 Qf_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, 10*Qv_ball])
@@ -75,8 +76,11 @@ def create_system_model(plant, scene_graph):
     # (rigid hydroelastic contact included)
     urdf = "models/kinova_gen3/urdf/GEN3_URDF_V12.urdf"
     arm = Parser(plant).AddModelFromFile(urdf)
+    X_robot = RigidTransform()
+    X_robot.set_translation([0,0,0.02])  # base attachment sets the robot 2cm up
     plant.WeldFrames(plant.world_frame(),
-                     plant.GetFrameByName("base_link", arm))
+                     plant.GetFrameByName("base_link", arm),
+                     X_robot)
     
     # Add an unactuated gripper from urdf
     # (rigid hydroelastic contact included)
@@ -130,7 +134,6 @@ def create_system_model(plant, scene_graph):
             ground_shape, "ground_collision", ground_props)
 
     # Add a ball with compliant hydroelastic contact
-    radius = 0.1
     mass = 0.258
     I = SpatialInertia(mass, np.zeros(3), UnitInertia.HollowSphere(radius))
     ball_instance = plant.AddModelInstance("ball")
