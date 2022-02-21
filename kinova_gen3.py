@@ -13,7 +13,7 @@ from ilqr import IterativeLinearQuadraticRegulator
 
 # Choose what to do
 simulate = False   # Run a simple simulation with fixed input
-optimize = True    # Find an optimal trajectory using ilqr
+optimize = False    # Find an optimal trajectory using ilqr
 playback = True    # Visualize the optimal trajectory by playing it back.
                    # If optimize=False, attempts to load a previously saved
                    # trajectory from a file.
@@ -26,7 +26,7 @@ save_file = "test.npz"
 
 T = 0.5
 dt = 1e-2
-playback_rate = 1.0
+playback_rate = 0.25
 
 # Some useful joint angle definitions
 q_home = np.pi/180*np.array([0, 15, 180, 230, 0, 55, 90])
@@ -34,7 +34,7 @@ q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, n
 q_push = np.array([0.0, np.pi/4+0.14, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
 q_wrap = np.pi/180*np.array([52, 122, 114, 240, 217, 55, 11])
 
-radius = 0.107   # of ball
+radius = 0.11   # of ball
 q_ball_start = np.array([0,0,0,1,0.6,0,radius])
 q_ball_target = np.array([0,0,0,1,0.9,0.0,radius])
 
@@ -57,7 +57,7 @@ R = 0.01*np.eye(7)
 Qf = np.diag(Qf_diag)
 
 # Contact model parameters
-dissipation = 3.0              # controls "bounciness" of collisions: lower is bouncier
+dissipation = 5.0              # controls "bounciness" of collisions: lower is bouncier
 hydroelastic_modulus = 5e6     # controls "squishiness" of collisions: lower is squishier
 resolution_hint = 0.05         # smaller means a finer mesh
 
@@ -125,7 +125,7 @@ def create_system_model(plant, scene_graph):
     # Add a ground with compliant hydroelastic contact
     ground_props = ProximityProperties()
     AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus,ground_props)
-    friction = CoulombFriction(mu_static, mu_dynamic)
+    friction = CoulombFriction(0.7*mu_static, 0.7*mu_dynamic)
     AddContactMaterial(dissipation=dissipation, friction=friction, properties=ground_props)
     X_ground = RigidTransform()
     X_ground.set_translation([0,0,-0.5])
@@ -148,6 +148,31 @@ def create_system_model(plant, scene_graph):
 
     color = np.array([0.8,1.0,0.0,0.5])
     plant.RegisterVisualGeometry(ball, X_ball, Sphere(radius), "ball_visual", color)
+
+    # Add some spots to visualize the ball's roation
+    spot_color = np.array([0.0,0.00,0.0,0.5])
+    spot_radius = 0.05*radius;
+    spot = Sphere(spot_radius);
+    spot_offset = radius - 0.45*spot_radius;
+
+    plant.RegisterVisualGeometry(
+            ball, RigidTransform(RotationMatrix(),np.array([radius,0,0])),
+            spot, "sphere_x+", spot_color)
+    plant.RegisterVisualGeometry(
+            ball, RigidTransform(RotationMatrix(),np.array([-radius,0,0])),
+            spot, "sphere_x-", spot_color)
+    plant.RegisterVisualGeometry(
+            ball, RigidTransform(RotationMatrix(),np.array([0,radius,0])),
+            spot, "sphere_y+", spot_color)
+    plant.RegisterVisualGeometry(
+            ball, RigidTransform(RotationMatrix(),np.array([0,-radius,0])),
+            spot, "sphere_y-", spot_color)
+    plant.RegisterVisualGeometry(
+            ball, RigidTransform(RotationMatrix(),np.array([0,0,radius])),
+            spot, "sphere_z+", spot_color)
+    plant.RegisterVisualGeometry(
+            ball, RigidTransform(RotationMatrix(),np.array([0,0,-radius])),
+            spot, "sphere_z-", spot_color)
 
     # Choose contact model
     plant.set_contact_surface_representation(mesh_type)
@@ -188,7 +213,7 @@ if optimize:
     # Set up the optimizer
     num_steps = int(T/dt)
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-            beta=0.9, delta=1e-3, gamma=0)
+            beta=0.5, delta=1e-3, gamma=0)
 
     # Define the optimization problem
     ilqr.SetInitialState(x0)
