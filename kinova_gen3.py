@@ -18,7 +18,8 @@ playback = True    # Visualize the optimal trajectory by playing it back.
                    # If optimize=False, attempts to load a previously saved
                    # trajectory from a file.
 
-save_file = "test.npz"
+scenario = "lift"   # "lift", "forward", or "side"
+save_file = scenario + ".npz"
 
 ####################################
 # Parameters
@@ -34,20 +35,39 @@ q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, n
 q_push = np.array([0.0, np.pi/4+0.14, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
 q_wrap = np.pi/180*np.array([52, 125, 114, 244, 217, 57, 11])
 
+# Some useful ball pose definitions
 radius = 0.105   # of ball
-q_ball_start = np.array([0,0,0,1,0.155,0.0,radius])
-q_ball_target = np.array([0,0,0,1,0.155,0.0,radius+0.25])
+q_ball_start = np.array([0,0,0,1,0.6,0.0,radius])
+q_ball_target = np.array([0,0,0,1,0.6,0.0,radius])
+if scenario == "lift":
+    q_ball_start[4] = 0.155  # ball starts close to the base
+    q_ball_target[6] += 0.2   # goal is to lift it in the air
+elif scenario == "forward":
+    q_ball_target[4] += 0.2   # goal is to move the ball forward
+elif scenario == "side":
+    q_ball_target[5] += 0.15  # goal is to move the ball to the side
+else:
+    raise RuntimeError("Unknown scenario %s"%scenario)
+
 
 # Initial state
-x0 = np.hstack([q_wrap, q_ball_start, np.zeros(13)])
+q_start = q_push
+if scenario == "lift":
+    q_start = q_wrap
+x0 = np.hstack([q_start, q_ball_start, np.zeros(13)])
 
 # Target state
-x_nom = np.hstack([q_wrap, q_ball_target, np.zeros(13)])
+x_nom = np.hstack([q_start, q_ball_target, np.zeros(13)])
 
 # Quadratic cost
 Qq_robot = 0.0*np.ones(7)
 Qv_robot = 0.1*np.ones(7)
-Qq_ball = 1*np.array([0,0,0,0,0,0,100])
+Qq_ball = 1*np.array([0,0,0,0,100,100,100])
+if scenario == "lift":
+    # Don't penalize x and y position for the lifting example
+    Qq_ball[4] = 0
+    Qq_ball[5] = 0
+
 Qv_ball = 0.1*np.ones(6)
 Q_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, Qv_ball])
 Qf_diag = np.hstack([Qq_robot, Qq_ball, Qv_robot, 10*Qv_ball])
