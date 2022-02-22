@@ -27,16 +27,16 @@ save_file = scenario + ".npz"
 
 T = 0.5
 dt = 1e-2
-playback_rate = 0.25
+playback_rate = 0.5
 
 # Some useful joint angle definitions
 q_home = np.pi/180*np.array([0, 15, 180, 230, 0, 55, 90])
 q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, np.pi/2])
 q_push = np.array([0.0, np.pi/4+0.14, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
-q_wrap = np.pi/180*np.array([52, 125, 114, 244, 217, 57, 11])
+q_wrap = np.pi/180*np.array([55, 125, 114, 244, 217, 45, 8])
 
 # Some useful ball pose definitions
-radius = 0.105   # of ball
+radius = 0.1   # of ball
 q_ball_start = np.array([0,0,0,1,0.6,0.0,radius])
 q_ball_target = np.array([0,0,0,1,0.6,0.0,radius])
 if scenario == "lift":
@@ -97,7 +97,7 @@ def create_system_model(plant, scene_graph):
     urdf = "models/kinova_gen3/urdf/GEN3_URDF_V12.urdf"
     arm = Parser(plant).AddModelFromFile(urdf)
     X_robot = RigidTransform()
-    X_robot.set_translation([0,0,0.02])  # base attachment sets the robot 2cm up
+    X_robot.set_translation([0,0,0.015])  # base attachment sets the robot up a bit
     plant.WeldFrames(plant.world_frame(),
                      plant.GetFrameByName("base_link", arm),
                      X_robot)
