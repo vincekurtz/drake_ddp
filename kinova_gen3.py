@@ -18,7 +18,7 @@ playback = True    # Visualize the optimal trajectory by playing it back.
                    # If optimize=False, attempts to load a previously saved
                    # trajectory from a file.
 
-scenario = "lift"   # "lift", "forward", or "side"
+scenario = "side"   # "lift", "forward", or "side"
 save_file = scenario + ".npz"
 
 ####################################
@@ -27,12 +27,12 @@ save_file = scenario + ".npz"
 
 T = 0.5
 dt = 1e-2
-playback_rate = 0.5
+playback_rate = 0.125
 
 # Some useful joint angle definitions
 q_home = np.pi/180*np.array([0, 15, 180, 230, 0, 55, 90])
 q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, np.pi/2])
-q_push = np.array([0.0, np.pi/4+0.14, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
+q_push = np.array([0.0, np.pi/4+0.13, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
 q_wrap = np.pi/180*np.array([55, 125, 114, 244, 217, 45, 8])
 
 # Some useful ball pose definitions
