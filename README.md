@@ -34,6 +34,8 @@ These examples are simple benchmark control systems. iLQR can be compared with t
 #### Pendulum
 `pendulum.py`: simple swing-up control of an inverted pendulum.
 
+![](images/pendulum.gif)
+
 #### Acrobot
 `acrobot.py`: swingup control of an underactuated acrobot. Performs 50 receding-horizon resolves in the spirit of model predictive control (MPC). 
 
