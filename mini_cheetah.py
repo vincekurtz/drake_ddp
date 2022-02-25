@@ -2,8 +2,8 @@
 
 ##
 #
-# Simple simulation to test Drake's new hydroelastic 
-# contact model on the mini cheetah quadruped.
+# Contact-implicit trajectory optimization for
+# automatic gait discovery on a Mini Cheetah quadruped.
 #
 ##
 

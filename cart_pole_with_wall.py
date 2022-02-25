@@ -2,8 +2,8 @@
 
 ##
 #
-# Simple simulation to test Drake's new hydroelastic 
-# contact model.
+# A simple example to test Drake's new hydroelastic 
+# contact model: adding a wall to the cart-pole.
 #
 ##
 

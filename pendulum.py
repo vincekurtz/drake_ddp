@@ -2,7 +2,7 @@
 
 ##
 #
-# Do swing-up control of a simple inverted pendulum
+# Swing-up control of a simple inverted pendulum
 #
 ##
 
@@ -46,6 +46,7 @@ def create_system_model(plant):
 ####################################
 # Create system diagram
 ####################################
+
 builder = DiagramBuilder()
 
 plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)

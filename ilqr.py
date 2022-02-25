@@ -1,6 +1,6 @@
 ##
 #
-# A simple implementation of iterative LQR (iLQR) for Drake MultibodyPlants.
+# A simple implementation of iterative LQR (iLQR) for discrete-time systems in Drake.
 #
 ##
 

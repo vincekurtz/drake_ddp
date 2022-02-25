@@ -2,7 +2,7 @@
 
 ##
 #
-# Do swing-up control of an acrobot
+# Swing-up control of an acrobot
 #
 ##
 

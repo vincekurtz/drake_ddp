@@ -2,8 +2,8 @@
 
 ##
 #
-# Simple simulation to test Drake's new hydroelastic 
-# contact model.
+# Contact-implicit trajectory optimization for whole-arm manipulation
+# using a Kinova Gen3 manipulator arm.
 #
 ##
 
@@ -48,7 +48,6 @@ elif scenario == "side":
     q_ball_target[5] += 0.15  # goal is to move the ball to the side
 else:
     raise RuntimeError("Unknown scenario %s"%scenario)
-
 
 # Initial state
 q_start = q_push

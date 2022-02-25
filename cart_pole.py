@@ -2,7 +2,7 @@
 
 ##
 #
-# Do swing-up control of a cart-pole system
+# Swing-up control of a cart-pole system
 #
 ##
 
