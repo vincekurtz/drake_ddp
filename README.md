@@ -4,6 +4,9 @@ This repository contains code for trajectory optimization using Differential Dyn
 and Iterative LQR (iLQR) in [Drake](https://drake.mit.edu/), with a particular focus on optimization
 through [hydroelastic](https://drake.mit.edu/doxygen_cxx/group__hydroelastic__user__guide.html) contact. 
 
+This code accompanies the paper *Contact-Implicit Trajectory Optimization with Hydroelastic Contact and iLQR*
+by Vince Kurtz and Hai Lin, [https://arxiv.org/abs/2202.13986](https://arxiv.org/abs/2202.13986).
+
 ## Installation
 
 Install the dependencies:
