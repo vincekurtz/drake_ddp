@@ -33,7 +33,7 @@
     <child link="robotiq_85_right_knuckle_link"/>
     <axis xyz="0 0 1"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.05490451627 -0.03060114443 0.0"/>
-    <limit effort="1000" lower="-3.14" upper="3.14" velocity="100.0"/>
+    <limit effort="1000" lower="0.0" upper="0.80285" velocity="0.5"/>
     <mimic joint="robotiq_85_left_knuckle_joint"/>
   </joint>
   <link name="robotiq_85_left_knuckle_link">
@@ -250,8 +250,11 @@
   <!-- Bushings for modeling closed-loop linkage -->
   <frame name="left_bushing_frame_A" link="robotiq_85_left_finger_link" rpy="0 0 0" xyz="0.0472 -0.0061 0"/>
   <frame name="left_bushing_frame_B" link="robotiq_85_left_finger_tip_link" rpy="0 0 0" xyz="-0.00645 -0.01788 0"/>
+  <frame name="right_bushing_frame_A" link="robotiq_85_right_finger_link" rpy="0 0 0" xyz="0.0472 -0.0061 0"/>
+  <frame name="right_bushing_frame_B" link="robotiq_85_right_finger_tip_link" rpy="0 0 0" xyz="-0.00645 -0.01788 0"/>
 
   <!-- DEBUG -->
+  <!--
   <link name="left_bushing_A">
     <visual>
       <geometry>
@@ -279,10 +282,19 @@
     <child link="left_bushing_B"/>
     <origin rpy="0.0 0.0 0.0" xyz="-0.00645 -0.01788 0.0"/>
   </joint>
+  -->
 
   <drake:linear_bushing_rpy>
     <drake:bushing_frameA name="left_bushing_frame_A"/>
     <drake:bushing_frameC name="left_bushing_frame_B"/>
+    <drake:bushing_torque_stiffness value="20 20 0"/>
+    <drake:bushing_torque_damping value="2 2 0"/>
+    <drake:bushing_force_stiffness value="20 20 20"/>
+    <drake:bushing_force_damping value="2 2 2"/>
+  </drake:linear_bushing_rpy>
+  <drake:linear_bushing_rpy>
+    <drake:bushing_frameA name="right_bushing_frame_A"/>
+    <drake:bushing_frameC name="right_bushing_frame_B"/>
     <drake:bushing_torque_stiffness value="20 20 0"/>
     <drake:bushing_torque_damping value="2 2 0"/>
     <drake:bushing_force_stiffness value="20 20 20"/>
@@ -296,6 +308,16 @@
       <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
     </joint>
     <actuator name="robotiq_85_left_knuckle_motor">
+      <mechanicalReduction>1</mechanicalReduction>
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </actuator>
+  </transmission>
+  <transmission name="robotiq_85_right_knuckle_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="robotiq_85_right_knuckle_joint">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="robotiq_85_right_knuckle_motor">
       <mechanicalReduction>1</mechanicalReduction>
       <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
     </actuator>
