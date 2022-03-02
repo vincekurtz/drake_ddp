@@ -269,6 +269,20 @@
   <frame name="left_bushing_frame_A" link="robotiq_85_left_finger_link" rpy="0 0 0" xyz="0.01 0 0"/>
   <frame name="left_bushing_frame_B" link="robotiq_85_left_finger_tip_link" rpy="0 0 0" xyz="0 0 0"/>
 
+  <!-- DEBUG -->
+  <link name="left_bushing_A"></link>
+  <joint name="test_A" type="fixed">
+    <parent link="robotiq_85_left_finger_link"/>
+    <child link="left_bushing_A"/>
+    <origin rpy="0.0 0.0 0.0" xyz="0.047 -0.0057 0.0"/>
+  </joint>
+  <link name="left_bushing_B"></link>
+  <joint name="test_B" type="fixed">
+    <parent link="robotiq_85_left_finger_tip_link"/>
+    <child link="left_bushing_B"/>
+    <origin rpy="0.0 0.0 0.0" xyz="-0.007 -0.0174 0.0"/>
+  </joint>
+
   <!--
   <drake:linear_bushing_rpy>
     <drake:bushing_frameA name="left_bushing_frame_A"/>
