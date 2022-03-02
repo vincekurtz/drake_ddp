@@ -10,6 +10,10 @@
       <geometry>
         <mesh filename="../meshes/collision/robotiq_85_base_link.obj"/>
       </geometry>
+      <drake:proximity_properties>
+        <drake:rigid_hydroelastic/>
+        <drake:hunt_crossley_dissipation value="1.25"/>
+      </drake:proximity_properties>
     </collision>
     <inertial>
       <mass value="0.636951"/>
@@ -42,6 +46,10 @@
       <geometry>
         <mesh filename="../meshes/collision/robotiq_85_knuckle_link.obj"/>
       </geometry>
+      <drake:proximity_properties>
+        <drake:rigid_hydroelastic/>
+        <drake:hunt_crossley_dissipation value="1.25"/>
+      </drake:proximity_properties>
     </collision>
     <inertial>
       <mass value="0.018491"/>
@@ -59,6 +67,10 @@
       <geometry>
         <mesh filename="../meshes/collision/robotiq_85_knuckle_link.obj"/>
       </geometry>
+      <drake:proximity_properties>
+        <drake:rigid_hydroelastic/>
+        <drake:hunt_crossley_dissipation value="1.25"/>
+      </drake:proximity_properties>
     </collision>
     <inertial>
       <mass value="0.018491"/>
@@ -86,6 +98,10 @@
       <geometry>
         <mesh filename="../meshes/collision/robotiq_85_finger_link.obj"/>
       </geometry>
+      <drake:proximity_properties>
+        <drake:rigid_hydroelastic/>
+        <drake:hunt_crossley_dissipation value="1.25"/>
+      </drake:proximity_properties>
     </collision>
     <inertial>
       <mass value="0.027309"/>
@@ -103,6 +119,10 @@
       <geometry>
         <mesh filename="../meshes/collision/robotiq_85_finger_link.obj"/>
       </geometry>
+      <drake:proximity_properties>
+        <drake:rigid_hydroelastic/>
+        <drake:hunt_crossley_dissipation value="1.25"/>
+      </drake:proximity_properties>
     </collision>
     <inertial>
       <mass value="0.027309"/>
@@ -136,6 +156,10 @@
       <geometry>
         <mesh filename="../meshes/collision/robotiq_85_inner_knuckle_link.obj"/>
       </geometry>
+      <drake:proximity_properties>
+        <drake:rigid_hydroelastic/>
+        <drake:hunt_crossley_dissipation value="1.25"/>
+      </drake:proximity_properties>
     </collision>
     <inertial>
       <mass value="0.029951"/>
@@ -153,6 +177,10 @@
       <geometry>
         <mesh filename="../meshes/collision/robotiq_85_inner_knuckle_link.obj"/>
       </geometry>
+      <drake:proximity_properties>
+        <drake:rigid_hydroelastic/>
+        <drake:hunt_crossley_dissipation value="1.25"/>
+      </drake:proximity_properties>
     </collision>
     <inertial>
       <mass value="0.029951"/>
@@ -186,6 +214,10 @@
       <geometry>
         <mesh filename="../meshes/collision/robotiq_85_finger_tip_link.obj"/>
       </geometry>
+      <drake:proximity_properties>
+        <drake:rigid_hydroelastic/>
+        <drake:hunt_crossley_dissipation value="1.25"/>
+      </drake:proximity_properties>
     </collision>
     <inertial>
       <mass value="0.019555"/>
@@ -203,6 +235,10 @@
       <geometry>
         <mesh filename="../meshes/collision/robotiq_85_finger_tip_link.obj"/>
       </geometry>
+      <drake:proximity_properties>
+        <drake:rigid_hydroelastic/>
+        <drake:hunt_crossley_dissipation value="1.25"/>
+      </drake:proximity_properties>
     </collision>
     <inertial>
       <mass value="0.019555"/>
@@ -210,21 +246,6 @@
       <inertia ixx="0.000002" ixy="0.000000" ixz="0.000000" iyx="0.000000" iyy="0.000005" iyz="0.000000" izx="0.000000" izy="0.000000" izz="0.000006"/>
     </inertial>
   </link>
-  <!-- Improve grasping physics -->
-  <gazebo reference="robotiq_85_left_finger_tip_link">
-    <kp>1000000.0</kp>
-    <kd>1.0</kd>
-    <mu1>1.0</mu1>
-    <mu2>1.0</mu2>
-    <minDepth>0.001</minDepth>
-  </gazebo>
-  <gazebo reference="robotiq_85_right_finger_tip_link">
-    <kp>1000000.0</kp>
-    <kd>1.0</kd>
-    <mu1>1.0</mu1>
-    <mu2>1.0</mu2>
-    <minDepth>0.001</minDepth>
-  </gazebo>
   <transmission name="robotiq_85_left_knuckle_trans">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="robotiq_85_left_knuckle_joint">
@@ -235,31 +256,17 @@
       <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
     </actuator>
   </transmission>
-  <!-- Mimic joints -->
-  <gazebo>
-    <plugin filename="libgazebo_mimic_joint_plugin.so" name="mimic_robotiq_85_1">
-      <joint>robotiq_85_left_knuckle_joint</joint>
-      <mimicJoint>robotiq_85_right_knuckle_joint</mimicJoint>
-    </plugin>
-    <plugin filename="libgazebo_mimic_joint_plugin.so" name="mimic_robotiq_85_2">
-      <joint>robotiq_85_left_knuckle_joint</joint>
-      <mimicJoint>robotiq_85_left_inner_knuckle_joint</mimicJoint>
-    </plugin>
-    <plugin filename="libgazebo_mimic_joint_plugin.so" name="mimic_robotiq_85_3">
-      <joint>robotiq_85_left_knuckle_joint</joint>
-      <mimicJoint>robotiq_85_right_inner_knuckle_joint</mimicJoint>
-    </plugin>
-    <plugin filename="libgazebo_mimic_joint_plugin.so" name="mimic_robotiq_85_4">
-      <joint>robotiq_85_left_knuckle_joint</joint>
-      <mimicJoint>robotiq_85_left_finger_tip_joint</mimicJoint>
-      <multiplier>-1.0</multiplier>
-      <offset>0.0</offset>
-    </plugin>
-    <plugin filename="libgazebo_mimic_joint_plugin.so" name="mimic_robotiq_85_5">
-      <joint>robotiq_85_left_knuckle_joint</joint>
-      <mimicJoint>robotiq_85_right_finger_tip_joint</mimicJoint>
-      <multiplier>-1.0</multiplier>
-      <offset>0.0</offset>
-    </plugin>
-  </gazebo>
+  <!-- Ignore self-collisions -->
+  <drake:collision_filter_group name="self">
+    <drake:member link="robotiq_85_base_link"/>
+    <drake:member link="robotiq_85_left_knuckle_link"/>
+    <drake:member link="robotiq_85_left_inner_knuckle_link"/>
+    <drake:member link="robotiq_85_left_finger_link"/>
+    <drake:member link="robotiq_85_left_finger_tip_link"/>
+    <drake:member link="robotiq_85_right_knuckle_link"/>
+    <drake:member link="robotiq_85_right_inner_knuckle_link"/>
+    <drake:member link="robotiq_85_right_finger_link"/>
+    <drake:member link="robotiq_85_right_finger_tip_link"/>
+    <drake:ignored_collision_filter_group name="self"/>
+  </drake:collision_filter_group>
 </robot>
