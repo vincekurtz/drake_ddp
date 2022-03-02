@@ -3,19 +3,17 @@
   <link name="robotiq_85_base_link">
     <visual>
       <geometry>
-          <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/visual/robotiq_85_base_link.obj"/>
+          <mesh filename="../meshes/visual/robotiq_85_base_link.obj"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/collision/robotiq_85_base_link.obj"/>
+        <mesh filename="../meshes/collision/robotiq_85_base_link.obj"/>
       </geometry>
-      <!--
       <drake:proximity_properties>
         <drake:rigid_hydroelastic/>
         <drake:hunt_crossley_dissipation value="1.25"/>
       </drake:proximity_properties>
-      -->
     </collision>
     <inertial>
       <mass value="0.636951"/>
@@ -41,19 +39,17 @@
   <link name="robotiq_85_left_knuckle_link">
     <visual>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/visual/robotiq_85_knuckle_link.obj"/>
+        <mesh filename="../meshes/visual/robotiq_85_knuckle_link.obj"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/collision/robotiq_85_knuckle_link.obj"/>
+        <mesh filename="../meshes/collision/robotiq_85_knuckle_link.obj"/>
       </geometry>
-      <!--
       <drake:proximity_properties>
         <drake:rigid_hydroelastic/>
         <drake:hunt_crossley_dissipation value="1.25"/>
       </drake:proximity_properties>
-      -->
     </collision>
     <inertial>
       <mass value="0.018491"/>
@@ -64,19 +60,17 @@
   <link name="robotiq_85_right_knuckle_link">
     <visual>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/visual/robotiq_85_knuckle_link.obj"/>
+        <mesh filename="../meshes/visual/robotiq_85_knuckle_link.obj"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/collision/robotiq_85_knuckle_link.obj"/>
+        <mesh filename="../meshes/collision/robotiq_85_knuckle_link.obj"/>
       </geometry>
-      <!--
       <drake:proximity_properties>
         <drake:rigid_hydroelastic/>
         <drake:hunt_crossley_dissipation value="1.25"/>
       </drake:proximity_properties>
-      -->
     </collision>
     <inertial>
       <mass value="0.018491"/>
@@ -97,19 +91,17 @@
   <link name="robotiq_85_left_finger_link">
     <visual>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/visual/robotiq_85_finger_link.obj"/>
+        <mesh filename="../meshes/visual/robotiq_85_finger_link.obj"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/collision/robotiq_85_finger_link.obj"/>
+        <mesh filename="../meshes/collision/robotiq_85_finger_link.obj"/>
       </geometry>
-      <!--
       <drake:proximity_properties>
         <drake:rigid_hydroelastic/>
         <drake:hunt_crossley_dissipation value="1.25"/>
       </drake:proximity_properties>
-      -->
     </collision>
     <inertial>
       <mass value="0.027309"/>
@@ -120,19 +112,17 @@
   <link name="robotiq_85_right_finger_link">
     <visual>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/visual/robotiq_85_finger_link.obj"/>
+        <mesh filename="../meshes/visual/robotiq_85_finger_link.obj"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/collision/robotiq_85_finger_link.obj"/>
+        <mesh filename="../meshes/collision/robotiq_85_finger_link.obj"/>
       </geometry>
-      <!--
       <drake:proximity_properties>
         <drake:rigid_hydroelastic/>
         <drake:hunt_crossley_dissipation value="1.25"/>
       </drake:proximity_properties>
-      -->
     </collision>
     <inertial>
       <mass value="0.027309"/>
@@ -159,19 +149,17 @@
   <link name="robotiq_85_left_inner_knuckle_link">
     <visual>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/visual/robotiq_85_inner_knuckle_link.obj"/>
+        <mesh filename="../meshes/visual/robotiq_85_inner_knuckle_link.obj"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/collision/robotiq_85_inner_knuckle_link.obj"/>
+        <mesh filename="../meshes/collision/robotiq_85_inner_knuckle_link.obj"/>
       </geometry>
-      <!--
       <drake:proximity_properties>
         <drake:rigid_hydroelastic/>
         <drake:hunt_crossley_dissipation value="1.25"/>
       </drake:proximity_properties>
-      -->
     </collision>
     <inertial>
       <mass value="0.029951"/>
@@ -182,19 +170,17 @@
   <link name="robotiq_85_right_inner_knuckle_link">
     <visual>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/visual/robotiq_85_inner_knuckle_link.obj"/>
+        <mesh filename="../meshes/visual/robotiq_85_inner_knuckle_link.obj"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/collision/robotiq_85_inner_knuckle_link.obj"/>
+        <mesh filename="../meshes/collision/robotiq_85_inner_knuckle_link.obj"/>
       </geometry>
-      <!--
       <drake:proximity_properties>
         <drake:rigid_hydroelastic/>
         <drake:hunt_crossley_dissipation value="1.25"/>
       </drake:proximity_properties>
-      -->
     </collision>
     <inertial>
       <mass value="0.029951"/>
@@ -221,19 +207,17 @@
   <link name="robotiq_85_left_finger_tip_link">
     <visual>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/visual/robotiq_85_finger_tip_link.obj"/>
+        <mesh filename="../meshes/visual/robotiq_85_finger_tip_link.obj"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/collision/robotiq_85_finger_tip_link.obj"/>
+        <mesh filename="../meshes/collision/robotiq_85_finger_tip_link.obj"/>
       </geometry>
-      <!--
       <drake:proximity_properties>
         <drake:rigid_hydroelastic/>
         <drake:hunt_crossley_dissipation value="1.25"/>
       </drake:proximity_properties>
-      -->
     </collision>
     <inertial>
       <mass value="0.019555"/>
@@ -244,19 +228,17 @@
   <link name="robotiq_85_right_finger_tip_link">
     <visual>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/visual/robotiq_85_finger_tip_link.obj"/>
+        <mesh filename="../meshes/visual/robotiq_85_finger_tip_link.obj"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://urdf_tutorial/../../../../../home/vjkurtz/projects/drake_ddp/models/2f_85_gripper/meshes/collision/robotiq_85_finger_tip_link.obj"/>
+        <mesh filename="../meshes/collision/robotiq_85_finger_tip_link.obj"/>
       </geometry>
-  <!--
       <drake:proximity_properties>
         <drake:rigid_hydroelastic/>
         <drake:hunt_crossley_dissipation value="1.25"/>
       </drake:proximity_properties>
-      -->
     </collision>
     <inertial>
       <mass value="0.019555"/>
@@ -266,33 +248,46 @@
   </link>
 
   <!-- Bushings for modeling closed-loop linkage -->
-  <frame name="left_bushing_frame_A" link="robotiq_85_left_finger_link" rpy="0 0 0" xyz="0.01 0 0"/>
-  <frame name="left_bushing_frame_B" link="robotiq_85_left_finger_tip_link" rpy="0 0 0" xyz="0 0 0"/>
+  <frame name="left_bushing_frame_A" link="robotiq_85_left_finger_link" rpy="0 0 0" xyz="0.0472 -0.0061 0"/>
+  <frame name="left_bushing_frame_B" link="robotiq_85_left_finger_tip_link" rpy="0 0 0" xyz="-0.00645 -0.01788 0"/>
 
   <!-- DEBUG -->
-  <link name="left_bushing_A"></link>
+  <link name="left_bushing_A">
+    <visual>
+      <geometry>
+        <box size="0.0001 0.0001 0.1"/>
+      </geometry>
+      <material>
+        <color rgba="1 0 0 1"/>
+      </material>
+    </visual>
+  </link>
   <joint name="test_A" type="fixed">
     <parent link="robotiq_85_left_finger_link"/>
     <child link="left_bushing_A"/>
-    <origin rpy="0.0 0.0 0.0" xyz="0.047 -0.0057 0.0"/>
+    <origin rpy="0.0 0.0 0.0" xyz="0.0472 -0.0061 0.0"/>
   </joint>
-  <link name="left_bushing_B"></link>
+  <link name="left_bushing_B">
+    <visual>
+      <geometry>
+        <box size="0.0001 0.0001 0.1"/>
+      </geometry>
+    </visual>
+  </link>
   <joint name="test_B" type="fixed">
     <parent link="robotiq_85_left_finger_tip_link"/>
     <child link="left_bushing_B"/>
-    <origin rpy="0.0 0.0 0.0" xyz="-0.007 -0.0174 0.0"/>
+    <origin rpy="0.0 0.0 0.0" xyz="-0.00645 -0.01788 0.0"/>
   </joint>
 
-  <!--
   <drake:linear_bushing_rpy>
     <drake:bushing_frameA name="left_bushing_frame_A"/>
     <drake:bushing_frameC name="left_bushing_frame_B"/>
-    <drake:bushing_torque_stiffness value="2 2 0"/>
+    <drake:bushing_torque_stiffness value="20 20 0"/>
     <drake:bushing_torque_damping value="2 2 0"/>
-    <drake:bushing_force_stiffness value="2 2 2"/>
+    <drake:bushing_force_stiffness value="20 20 20"/>
     <drake:bushing_force_damping value="2 2 2"/>
   </drake:linear_bushing_rpy>
-  -->
 
 
   <transmission name="robotiq_85_left_knuckle_trans">
@@ -305,8 +300,6 @@
       <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
     </actuator>
   </transmission>
-  <!-- Ignore self-collisions -->
-  <!--
   <drake:collision_filter_group name="self">
     <drake:member link="robotiq_85_base_link"/>
     <drake:member link="robotiq_85_left_knuckle_link"/>
@@ -319,5 +312,4 @@
     <drake:member link="robotiq_85_right_finger_tip_link"/>
     <drake:ignored_collision_filter_group name="self"/>
   </drake:collision_filter_group>
-  -->
 </robot>

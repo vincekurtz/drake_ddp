@@ -24,9 +24,9 @@ save_file = "data/towers_of_hanoi.npz"
 # Parameters
 ####################################
 
-T = 0.005
-dt = 1e-2
-playback_rate = 0.5
+T = 1.0
+dt = 1e-3
+playback_rate = 1.0
 
 # Some useful configuration space definitions
 q_start = np.array([0.0,0.0,0.2, 0.0,0.0,0.0])   # x y z roll pitch yaw
@@ -74,6 +74,8 @@ def create_system_model(plant, scene_graph):
     plant.RegisterCollisionGeometry(plant.world_body(), X_ground,
             ground_shape, "ground_collision", ground_props)
 
+    # turn off gravity
+    plant.mutable_gravity_field().set_gravity_vector([0,0,0])
 
     # Choose contact model
     plant.set_contact_surface_representation(mesh_type)
@@ -93,6 +95,9 @@ plant, scene_graph = create_system_model(plant, scene_graph)
 params = DrakeVisualizerParams(role=Role.kIllustration, show_hydroelastic=True)
 DrakeVisualizer(params=params).AddToBuilder(builder, scene_graph)
 ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+
+# Connect to meshcat visualizer
+#ConnectMeshcatVisualizer(builder=builder, scene_graph=scene_graph)
 
 # Finailze the diagram
 diagram = builder.Build()
@@ -174,9 +179,13 @@ if playback:
 
 if simulate:
     # Fix zero input for now
-    plant.get_actuation_input_port().FixValue(plant_context, np.zeros(plant.num_actuators()))
+    plant.get_actuation_input_port().FixValue(plant_context, 1e-3+np.zeros(plant.num_actuators()))
 
     # Set initial state
+    q0 = np.zeros(13)
+    q0[0] = 1  # make a valid quaternion
+    q0[6] = 0.1  # z position
+    plant.SetPositions(plant_context,q0)
     #plant.SetPositionsAndVelocities(plant_context, x0)
     print(plant.num_positions())
     print(plant.num_velocities())
