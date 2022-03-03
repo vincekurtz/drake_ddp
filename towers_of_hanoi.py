@@ -24,8 +24,8 @@ save_file = "data/towers_of_hanoi.npz"
 # Parameters
 ####################################
 
-T = 1.0
-dt = 1e-3
+T = 1.0001
+dt = 5e-3
 playback_rate = 1.0
 
 # Some useful configuration space definitions
@@ -60,19 +60,32 @@ mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 def create_system_model(plant, scene_graph):
     # Add an unactuated gripper from urdf
     # (rigid hydroelastic contact included)
-    urdf = "models/2f_85_gripper/urdf/robotiq_85_gripper.urdf"
+    urdf = "models/2f_85_gripper/urdf/robotiq_85_gripper_simple.urdf"
     gripper = Parser(plant).AddModelFromFile(urdf)
 
     # Add a ground with compliant hydroelastic contact
     ground_props = ProximityProperties()
-    AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus,ground_props)
-    friction = CoulombFriction(0.7*mu_static, 0.7*mu_dynamic)
+    AddCompliantHydroelasticProperties(resolution_hint,hydroelastic_modulus,ground_props)
+    friction = CoulombFriction(mu_static, mu_dynamic)
     AddContactMaterial(dissipation=dissipation, friction=friction, properties=ground_props)
     X_ground = RigidTransform()
     X_ground.set_translation([0,0,-0.5])
     ground_shape = Box(25,25,1)
     plant.RegisterCollisionGeometry(plant.world_body(), X_ground,
             ground_shape, "ground_collision", ground_props)
+
+    ## Add a box with compliant hydroelastic contact
+    #l,w,h = (0.02, 0.02, 0.2)
+    #I = SpatialInertia(0.1, np.zeros(3), UnitInertia.SolidBox(l,w,h))
+    #box = plant.AddRigidBody("box", plant.AddModelInstance("box"), I)
+
+    #color = np.array([0.1,0.1,0.9,0.9])
+    #plant.RegisterVisualGeometry(box, RigidTransform(), Box(l,w,h), "box", color)
+    #
+    #box_props = ProximityProperties()
+    #AddCompliantHydroelasticProperties(resolution_hint,hydroelastic_modulus,box_props)
+    #AddContactMaterial(dissipation=1,friction=CoulombFriction(mu_static, mu_dynamic), properties=box_props)
+    #plant.RegisterCollisionGeometry(box, RigidTransform(), Box(l,w,h), "box_collision", box_props)
 
     # turn off gravity
     plant.mutable_gravity_field().set_gravity_vector([0,0,0])
@@ -180,18 +193,26 @@ if playback:
 if simulate:
     # Fix zero input for now
     plant.get_actuation_input_port().FixValue(plant_context, 1e-3+np.zeros(plant.num_actuators()))
-
-    # Set initial state
-    q0 = np.zeros(13)
-    q0[0] = 1  # make a valid quaternion
-    q0[6] = 0.1  # z position
-    plant.SetPositions(plant_context,q0)
-    #plant.SetPositionsAndVelocities(plant_context, x0)
+    
     print(plant.num_positions())
     print(plant.num_velocities())
     print(plant.num_actuators())
-
     print(plant.CalcTotalMass(plant_context))
+
+    # Set initial state
+    q0 = np.zeros(plant.num_positions())
+    q0[0] = 1  # make a valid quaternion
+    q0[6] = 0.1  # z position
+
+    q0_box = np.zeros(7)
+    q0_box[0] = 1
+    q0_box[6] = 0.1
+    q0_box[4] = 0.10
+
+    gripper = plant.GetModelInstanceByName("robotiq_85_gripper")
+    #box = plant.GetModelInstanceByName("box")
+    plant.SetPositions(plant_context,gripper,q0)
+    #plant.SetPositions(plant_context,box,q0_box)
     
     # Simulate the system
     simulator = Simulator(diagram, diagram_context)
