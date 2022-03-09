@@ -11,8 +11,8 @@ from pydrake.all import *
 import time
 
 # Some simulation parameters 
-T = 2.0
-dt = 0.0
+T = 5.0
+dt = 1e-2
 realtime_rate = 0.0
 
 radius = 0.05
@@ -111,44 +111,58 @@ create_system_model(plant_, scene_graph_)
 system_ = builder_.Build()
 context_ = system_.CreateDefaultContext()
 
-## Compute dynamics x_{t+1} = f(x) explicitly
-#st = time.time()
-#x = np.hstack([q0, v0])
-#context_.SetDiscreteState(x)
-#state = context_.get_discrete_state()
-#st = time.time()
-#system_.CalcDiscreteVariableUpdates(context_, state)
-#et = time.time()-st
-#x_next = state.get_vector().value().flatten()
-#print("Computed forward dynamics in ",et)
-##print("x_next: ", x_next)
+# Compute dynamics x_{t+1} = f(x) explicitly
+st = time.time()
+x = np.hstack([q0, v0])
+context_.SetDiscreteState(x)
+state = context_.get_discrete_state()
+st = time.time()
+system_.CalcDiscreteVariableUpdates(context_, state)
+et = time.time()-st
+x_next = state.get_vector().value().flatten()
+print("Computed forward dynamics in ",et)
+#print("x_next: ", x_next)
 
-## Compute dynamics partials f_x via autodiff
-#system_ad = system_.ToAutoDiffXd()
-#context_ad = system_ad.CreateDefaultContext()
-#x_ad = InitializeAutoDiff(x)
-#context_ad.SetDiscreteState(x_ad)
-#state = context_ad.get_discrete_state()
-#st = time.time()
-#system_ad.CalcDiscreteVariableUpdates(context_ad, state)
-#et = time.time()-st
-#x_next_ad = state.get_vector().CopyToVector()
-#fx = ExtractGradient(x_next_ad)
-#print("Computed forward dynamics partials in ",et)
+# Compute dynamics partials f_x via autodiff
+system_ad = system_.ToAutoDiffXd()
+context_ad = system_ad.CreateDefaultContext()
+x_ad = InitializeAutoDiff(x)
+context_ad.SetDiscreteState(x_ad)
+state = context_ad.get_discrete_state()
+st = time.time()
+system_ad.CalcDiscreteVariableUpdates(context_ad, state)
+et = time.time()-st
+x_next_ad = state.get_vector().CopyToVector()
+fx = ExtractGradient(x_next_ad)
+print("Computed forward dynamics partials in ",et)
 #print("f_x: ",fx)
 
-#import matplotlib.pyplot as plt
-#plt.imshow(np.log(np.abs(fx)), cmap='gray')
-#plt.show()
+dq_dq = fx[:7,:7]
+dq_dv = fx[:7,7:]
+dv_dq = fx[7:,:7]
+dv_dv = fx[7:,7:]
 
-# Simulate the sytem
-simulator = Simulator(diagram, diagram_context)
+np.set_printoptions(formatter={'float': lambda x: "{0:0.8f}".format(x)})
+print(dv_dv)
+print("dq_dq: ",np.max(dq_dq))
+print("dq_dv: ",np.max(dq_dv))
+print("dv_dq: ",np.max(dv_dq))
+print("dv_dv: ",np.max(dv_dv))
 
-print(GetIntegrationSchemes())
-ResetIntegratorFromFlags(simulator, "implicit_euler", 1e-2)
+import matplotlib.pyplot as plt
+plt.imshow(np.abs(fx), cmap='gray')
+plt.show()
 
-simulator.Initialize()
-integrator = simulator.get_integrator()
-print(integrator)
-simulator.set_target_realtime_rate(realtime_rate)
-simulator.AdvanceTo(T)
+## Simulate the sytem
+#simulator = Simulator(diagram, diagram_context)
+#
+#print(GetIntegrationSchemes())
+#ResetIntegratorFromFlags(simulator, "implicit_euler", 5e-3)
+#
+#simulator.Initialize()
+#integrator = simulator.get_integrator()
+#print(integrator)
+#integrator.set_fixed_step_mode(True)
+#print(integrator.get_fixed_step_mode())
+#simulator.set_target_realtime_rate(realtime_rate)
+#simulator.AdvanceTo(T)
