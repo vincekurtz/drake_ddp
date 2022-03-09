@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 
 #include <drake/geometry/proximity_properties.h>
 #include <drake/geometry/scene_graph.h>
@@ -99,8 +100,13 @@ int main() {
 
   // Simulate forward one step
   std::unique_ptr<DiscreteValues<double>> update = diagram->AllocateDiscreteVariables();
+  auto st = std::chrono::high_resolution_clock::now();
   diagram->CalcDiscreteVariableUpdates(*diagram_context, update.get());
+  auto et = std::chrono::high_resolution_clock::now();
   VectorXd x_next = update->get_mutable_value();
+  std::chrono::duration<float> elapsed = et - st;
+
+  std::cout << "Computed forward dynamics in " << elapsed.count() << "s" << std::endl;
 
   std::cout << x_next << std::endl;
   return 0;

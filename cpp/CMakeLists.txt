@@ -8,6 +8,9 @@ else()
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Use aggressive techniques to get faster code
+#add_compile_options(-Ofast)
+
 # Include drake as an external library
 # Note that $CMAKE_PREFIX_PATH must be set accordingly
 find_package(drake CONFIG REQUIRED)
