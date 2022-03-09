@@ -17,9 +17,11 @@
 
 using namespace drake;
 
+using Eigen::VectorXd;
 using geometry::AddCompliantHydroelasticProperties;
 using geometry::AddContactMaterial;
 using geometry::AddRigidHydroelasticProperties;
+using geometry::HalfSpace;
 using geometry::ProximityProperties;
 using geometry::SceneGraph;
 using geometry::Sphere;
@@ -67,13 +69,19 @@ int main() {
   ProximityProperties ball_props;
   AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus, &ball_props);
   AddContactMaterial(dissipation, {}, surface_friction, &ball_props);
-  plant.RegisterCollisionGeometry(ball, X_BS, Sphere(radius), "collision",
+  plant.RegisterCollisionGeometry(ball, X_BS, Sphere(radius), "ball_collision",
                                      std::move(ball_props));
 
   const Vector4<double> orange(1.0, 0.55, 0.0, 1.0);
   plant.RegisterVisualGeometry(ball, X_BS, Sphere(radius), "visual", orange);
 
   // Add a ground with rigid hydroelastic contact
+  const RigidTransformd X_WS;
+  ProximityProperties ground_props;
+  AddRigidHydroelasticProperties(&ground_props);
+  AddContactMaterial(dissipation, {}, surface_friction, &ground_props);
+  plant.RegisterCollisionGeometry(plant.world_body(), X_WS, HalfSpace{}, "collision",
+      std::move(ground_props));
 
   // Compile the system diagram
   plant.Finalize();
@@ -81,13 +89,18 @@ int main() {
   std::unique_ptr<Context<double>> diagram_context = diagram->CreateDefaultContext();
 
   // Set initial conditions
-
+  VectorXd q0(7);
+  VectorXd v0(6);
+  q0 << 0, 0, 0, 1, -0.5, 0, 0.047;
+  v0 << 0, 0, 0, 0.5, 0, 0;
+  VectorXd x0(13);
+  x0 << q0, v0;
+  diagram_context->SetDiscreteState(x0);
 
   // Simulate forward one step
   std::unique_ptr<DiscreteValues<double>> update = diagram->AllocateDiscreteVariables();
-  //update->SetFrom(diagram_context->get_mutable_discrete_state());
   diagram->CalcDiscreteVariableUpdates(*diagram_context, update.get());
-  auto x_next = update->get_mutable_value();
+  VectorXd x_next = update->get_mutable_value();
 
   std::cout << x_next << std::endl;
   return 0;

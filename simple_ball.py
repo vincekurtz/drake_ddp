@@ -103,25 +103,25 @@ v0 = np.array([0,0,0,0.5,0,0.0])
 plant.SetPositions(plant_context, q0)
 plant.SetVelocities(plant_context, v0)
 
-## Create a separate system model for autodiff.
-## This is essentially what the iLQR controller will have access to.
-#builder_ = DiagramBuilder()
-#plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
-#create_system_model(plant_, scene_graph_)
-#system_ = builder_.Build()
-#context_ = system_.CreateDefaultContext()
-#
-## Compute dynamics x_{t+1} = f(x) explicitly
-#st = time.time()
-#x = np.hstack([q0, v0])
-#context_.SetDiscreteState(x)
-#state = context_.get_discrete_state()
-#st = time.time()
-#system_.CalcDiscreteVariableUpdates(context_, state)
-#et = time.time()-st
-#x_next = state.get_vector().value().flatten()
-#print("Computed forward dynamics in ",et)
-##print("x_next: ", x_next)
+# Create a separate system model for autodiff.
+# This is essentially what the iLQR controller will have access to.
+builder_ = DiagramBuilder()
+plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
+create_system_model(plant_, scene_graph_)
+system_ = builder_.Build()
+context_ = system_.CreateDefaultContext()
+
+# Compute dynamics x_{t+1} = f(x) explicitly
+st = time.time()
+x = np.hstack([q0, v0])
+context_.SetDiscreteState(x)
+state = context_.get_discrete_state()
+st = time.time()
+system_.CalcDiscreteVariableUpdates(context_, state)
+et = time.time()-st
+x_next = state.get_vector().value().flatten()
+print("Computed forward dynamics in ",et)
+print("x_next: ", x_next)
 #
 ## Compute dynamics partials f_x via autodiff
 #system_ad = system_.ToAutoDiffXd()
@@ -154,15 +154,15 @@ plant.SetVelocities(plant_context, v0)
 #plt.show()
 
 # Simulate the sytem
-simulator = Simulator(diagram, diagram_context)
-
-print(GetIntegrationSchemes())
-ResetIntegratorFromFlags(simulator, "implicit_euler", 5e-3)
-
-simulator.Initialize()
-integrator = simulator.get_integrator()
-print(integrator)
-integrator.set_fixed_step_mode(True)
-print(integrator.get_fixed_step_mode())
-simulator.set_target_realtime_rate(realtime_rate)
-simulator.AdvanceTo(T)
+#simulator = Simulator(diagram, diagram_context)
+#
+#print(GetIntegrationSchemes())
+#ResetIntegratorFromFlags(simulator, "implicit_euler", 5e-3)
+#
+#simulator.Initialize()
+#integrator = simulator.get_integrator()
+#print(integrator)
+#integrator.set_fixed_step_mode(True)
+#print(integrator.get_fixed_step_mode())
+#simulator.set_target_realtime_rate(realtime_rate)
+#simulator.AdvanceTo(T)
