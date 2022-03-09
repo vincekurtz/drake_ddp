@@ -88,6 +88,8 @@ int main() {
   plant.Finalize();
   auto diagram = builder.Build();
   std::unique_ptr<Context<double>> diagram_context = diagram->CreateDefaultContext();
+  Context<double>& plant_context = 
+    diagram->GetMutableSubsystemContext(plant, diagram_context.get());
 
   // Set initial conditions
   VectorXd q0(7);
@@ -99,15 +101,17 @@ int main() {
   diagram_context->SetDiscreteState(x0);
 
   // Simulate forward one step
-  std::unique_ptr<DiscreteValues<double>> update = diagram->AllocateDiscreteVariables();
+  std::unique_ptr<DiscreteValues<double>> update = plant.AllocateDiscreteVariables();
+  
   auto st = std::chrono::high_resolution_clock::now();
-  diagram->CalcDiscreteVariableUpdates(*diagram_context, update.get());
+  plant.CalcDiscreteVariableUpdates(plant_context, update.get());
   auto et = std::chrono::high_resolution_clock::now();
+  
   VectorXd x_next = update->get_mutable_value();
   std::chrono::duration<float> elapsed = et - st;
 
   std::cout << "Computed forward dynamics in " << elapsed.count() << "s" << std::endl;
-
   std::cout << x_next << std::endl;
+
   return 0;
 }
