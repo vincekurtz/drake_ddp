@@ -13,13 +13,13 @@ from ilqr import IterativeLinearQuadraticRegulator
 
 # Choose what to do
 simulate = False   # Run a simple simulation with fixed input
-optimize = True    # Find an optimal trajectory using ilqr
+optimize = False    # Find an optimal trajectory using ilqr
 playback = True    # Visualize the optimal trajectory by playing it back.
                    # If optimize=False, attempts to load a previously saved
                    # trajectory from a file.
 
-scenario = "side"   # "lift", "forward", or "side"
-save_file = scenario + ".npz"
+scenario = "lift"   # "lift", "forward", or "side"
+save_file = "data/" + scenario + ".npz"
 
 ####################################
 # Parameters
@@ -270,17 +270,23 @@ if playback:
         data = np.load(save_file)
         timesteps = data["t"]
         states = data["x_bar"]
+        controls = data["u_bar"]
 
     while True:
-        plant.get_actuation_input_port().FixValue(plant_context, 
-                np.zeros(plant.num_actuators()))
         # Just keep playing back the trajectory
         for i in range(len(timesteps)):
             t = timesteps[i]
             x = states[:,i]
+            u = controls[:,i]
 
             diagram_context.SetTime(t)
             plant.SetPositionsAndVelocities(plant_context, x)
+            plant.get_actuation_input_port().FixValue(plant_context,  u)
+            st = time.time()
+            diagram.CalcDiscreteVariableUpdates(diagram_context, 
+                    diagram_context.get_discrete_state())
+            et = time.time()
+            print("TAMSI step clock time: ", et-st)
             diagram.Publish(diagram_context)
 
             time.sleep(1/playback_rate*dt-4e-4)
