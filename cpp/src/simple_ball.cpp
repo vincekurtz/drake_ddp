@@ -44,14 +44,14 @@ int main() {
   config.contact_surface_representation = "polygon";
 
   // Ball parameters
-  double radius = 0.05;
-  double mass = 0.1;
+  const double radius = 0.05;
+  const double mass = 0.1;
 
   // Contact parameters
-  double dissipation = 0.0;
-  double hydroelastic_modulus = 5e4;
-  double resolution_hint = 0.002;
-  double mu = 0.7;
+  const double dissipation = 0.0;
+  const double hydroelastic_modulus = 5e4;
+  const double resolution_hint = 0.002;
+  const double mu = 0.7;
   const CoulombFriction<double> surface_friction(mu, mu);
 
   // Set up the system
@@ -65,7 +65,7 @@ int main() {
 
   const RigidTransformd X_BS;  // identity.
   ProximityProperties ball_props;
-  AddCompliantHydroelasticProperties(radius, hydroelastic_modulus, &ball_props);
+  AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus, &ball_props);
   AddContactMaterial(dissipation, {}, surface_friction, &ball_props);
   plant.RegisterCollisionGeometry(ball, X_BS, Sphere(radius), "collision",
                                      std::move(ball_props));
