@@ -6,6 +6,7 @@
 #include <drake/multibody/parsing/parser.h>
 #include <drake/multibody/plant/multibody_plant.h>
 #include <drake/multibody/plant/multibody_plant_config_functions.h>
+#include <drake/multibody/plant/tamsi_solver.h>
 #include <drake/systems/framework/context.h>
 #include <drake/systems/framework/diagram_builder.h>
 
@@ -27,11 +28,15 @@ using geometry::ProximityProperties;
 using geometry::SceneGraph;
 using geometry::Sphere;
 using math::RigidTransformd;
+using math::ExtractGradient;
+using math::InitializeAutoDiff;
 using multibody::CoulombFriction;
 using multibody::MultibodyPlant;
 using multibody::MultibodyPlantConfig;
 using multibody::RigidBody;
 using multibody::SpatialInertia;
+using multibody::TamsiSolver;
+using multibody::TamsiSolverResult;
 using multibody::UnitInertia;
 using systems::Context;
 using systems::Diagram;
@@ -106,12 +111,35 @@ int main() {
   auto st = std::chrono::high_resolution_clock::now();
   plant.CalcDiscreteVariableUpdates(plant_context, update.get());
   auto et = std::chrono::high_resolution_clock::now();
-  
+
   VectorXd x_next = update->get_mutable_value();
   std::chrono::duration<float> elapsed = et - st;
 
   std::cout << "Computed forward dynamics in " << elapsed.count() << "s" << std::endl;
   std::cout << x_next << std::endl;
+
+  // Make autodiff plant and compute dynamics gradients
+  auto system_ad = diagram->ToAutoDiffXd();
+  auto context_ad = system_ad->CreateDefaultContext();
+  auto x_ad = InitializeAutoDiff(x0);
+  context_ad->SetDiscreteState(x_ad);
+  std::unique_ptr<DiscreteValues<AutoDiffXd>> update_ad = system_ad->AllocateDiscreteVariables();
+
+  auto st_ad = std::chrono::high_resolution_clock::now();
+  system_ad->CalcDiscreteVariableUpdates(*context_ad, update_ad.get());
+  auto et_ad = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<float> elapsed_ad = et_ad - st_ad;
+  std::cout << "Computed autodiff gradients in " << elapsed_ad.count() << "s" << std::endl;
+
+  auto x_next_ad = update_ad->get_mutable_value();
+  auto fx = ExtractGradient(x_next_ad);
+  std::cout << fx << std::endl;
+
+  // DEBUG
+  //TamsiSolver<double> tamsi_solver(plant.num_velocities());
+  //const VectorXd v_guess(6);
+  //TamsiSolverResult result = tamsi_solver.SolveWithGuess(1e-2, v_guess);
+  //std::cout << tamsi_solver.get_generalized_friction_forces() << std::endl;
 
   return 0;
 }

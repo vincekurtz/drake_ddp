@@ -122,20 +122,20 @@ et = time.time()-st
 x_next = state.get_vector().value().flatten()
 print("Computed forward dynamics in ",et)
 print("x_next: ", x_next)
-#
-## Compute dynamics partials f_x via autodiff
-#system_ad = system_.ToAutoDiffXd()
-#context_ad = system_ad.CreateDefaultContext()
-#x_ad = InitializeAutoDiff(x)
-#context_ad.SetDiscreteState(x_ad)
-#state = context_ad.get_discrete_state()
-#st = time.time()
-#system_ad.CalcDiscreteVariableUpdates(context_ad, state)
-#et = time.time()-st
-#x_next_ad = state.get_vector().CopyToVector()
-#fx = ExtractGradient(x_next_ad)
-#print("Computed forward dynamics partials in ",et)
-##print("f_x: ",fx)
+
+# Compute dynamics partials f_x via autodiff
+system_ad = system_.ToAutoDiffXd()
+context_ad = system_ad.CreateDefaultContext()
+x_ad = InitializeAutoDiff(x)
+context_ad.SetDiscreteState(x_ad)
+state = context_ad.get_discrete_state()
+st = time.time()
+system_ad.CalcDiscreteVariableUpdates(context_ad, state)
+et = time.time()-st
+x_next_ad = state.get_vector().CopyToVector()
+fx = ExtractGradient(x_next_ad)
+print("Computed forward dynamics partials in ",et)
+print("f_x: ",fx)
 #
 #dq_dq = fx[:7,:7]
 #dq_dv = fx[:7,7:]
