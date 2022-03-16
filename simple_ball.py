@@ -20,7 +20,7 @@ mass = 0.1
 
 dissipation = 0.0              # controls "bounciness" of collisions: lower is bouncier
 hydroelastic_modulus = 5e4     # controls "squishiness" of collisions: lower is squishier
-resolution_hint = 0.002         # smaller means a finer mesh
+resolution_hint = 0.05         # smaller means a finer mesh
 mu = 0.7                       # friction coefficient, same for static and dynamic
 surface_type = HydroelasticContactRepresentation.kPolygon  # Polygon or Triangle
 
@@ -99,7 +99,7 @@ plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
 # Set initial conditions
 q0 = np.array([0,0,0,1,-0.5,0,0.047])
-v0 = np.array([0,0,0,0.5,0,0.0])
+v0 = np.array([0,0,0,0,0,0.0])
 plant.SetPositions(plant_context, q0)
 plant.SetVelocities(plant_context, v0)
 
@@ -149,9 +149,9 @@ print("f_x: ",fx)
 #print("dv_dq: ",np.max(dv_dq))
 #print("dv_dv: ",np.max(dv_dv))
 #
-#import matplotlib.pyplot as plt
-#plt.imshow(np.abs(fx), cmap='gray')
-#plt.show()
+import matplotlib.pyplot as plt
+plt.imshow(np.abs(fx), cmap='gray')
+plt.show()
 
 # Simulate the sytem
 #simulator = Simulator(diagram, diagram_context)

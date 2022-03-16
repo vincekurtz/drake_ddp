@@ -47,7 +47,7 @@ int main() {
 
   // Plant parameters
   MultibodyPlantConfig config;
-  config.time_step = 1e-2;
+  config.time_step = 1e-3;
   config.contact_model = "hydroelastic";
   config.contact_surface_representation = "polygon";
 
@@ -58,7 +58,7 @@ int main() {
   // Contact parameters
   const double dissipation = 0.0;
   const double hydroelastic_modulus = 5e4;
-  const double resolution_hint = 0.002;
+  const double resolution_hint = 0.03;
   const double mu = 0.7;
   const CoulombFriction<double> surface_friction(mu, mu);
 
@@ -105,41 +105,87 @@ int main() {
   x0 << q0, v0;
   diagram_context->SetDiscreteState(x0);
 
-  // Simulate forward one step
-  std::unique_ptr<DiscreteValues<double>> update = plant.AllocateDiscreteVariables();
-  
+  // Timer variables
   auto st = std::chrono::high_resolution_clock::now();
-  plant.CalcDiscreteVariableUpdates(plant_context, update.get());
   auto et = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<float> elapsed;
 
-  VectorXd x_next = update->get_mutable_value();
-  std::chrono::duration<float> elapsed = et - st;
+  // Simulate forward one step
+  //std::unique_ptr<DiscreteValues<double>> update = plant.AllocateDiscreteVariables();
+  //st = std::chrono::high_resolution_clock::now();
+  //plant.CalcDiscreteVariableUpdates(plant_context, update.get());
+  //et = std::chrono::high_resolution_clock::now();
+  //elapsed = et - st;
+  //std::cout << "Computed forward dynamics in " << elapsed.count() << "s" << std::endl;
 
-  std::cout << "Computed forward dynamics in " << elapsed.count() << "s" << std::endl;
-  std::cout << x_next << std::endl;
+  //VectorXd x_next = update->get_mutable_value();
+  //std::cout << x_next << std::endl;
 
-  // Make autodiff plant and compute dynamics gradients
+  // Compute dynamics gradients with autodiff
   auto system_ad = diagram->ToAutoDiffXd();
   auto context_ad = system_ad->CreateDefaultContext();
   auto x_ad = InitializeAutoDiff(x0);
   context_ad->SetDiscreteState(x_ad);
   std::unique_ptr<DiscreteValues<AutoDiffXd>> update_ad = system_ad->AllocateDiscreteVariables();
 
-  auto st_ad = std::chrono::high_resolution_clock::now();
+  st = std::chrono::high_resolution_clock::now();
   system_ad->CalcDiscreteVariableUpdates(*context_ad, update_ad.get());
-  auto et_ad = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<float> elapsed_ad = et_ad - st_ad;
-  std::cout << "Computed autodiff gradients in " << elapsed_ad.count() << "s" << std::endl;
+  et = std::chrono::high_resolution_clock::now();
+  elapsed = et - st;
+  std::cout << "Computed autodiff gradients in " << elapsed.count() << "s" << std::endl;
 
   auto x_next_ad = update_ad->get_mutable_value();
-  auto fx = ExtractGradient(x_next_ad);
-  std::cout << fx << std::endl;
+  auto fx_ad = ExtractGradient(x_next_ad);
 
-  // DEBUG
-  //TamsiSolver<double> tamsi_solver(plant.num_velocities());
-  //const VectorXd v_guess(6);
-  //TamsiSolverResult result = tamsi_solver.SolveWithGuess(1e-2, v_guess);
-  //std::cout << tamsi_solver.get_generalized_friction_forces() << std::endl;
+  // Compute approximate dynamics gradients with our method
+  Eigen::VectorXd x_next(13);
+  Eigen::MatrixXd fx(13,13);
+  Eigen::MatrixXd fu(0,0);
 
+  st = std::chrono::high_resolution_clock::now();
+  plant.DiscreteDynamicsWithApproximateGradients(plant_context, &x_next, &fx, &fu);
+  et = std::chrono::high_resolution_clock::now();
+  elapsed = et - st;
+  std::cout << "Computed forward dynamics with approx gradient in " << elapsed.count() << "s" << std::endl;
+ 
+  // Compare autodiff and approximate gradients
+  auto dq_dq_ad = fx_ad.topLeftCorner(7,7);
+  auto dq_dv_ad = fx_ad.topRightCorner(7,6);
+  auto dv_dq_ad = fx_ad.bottomLeftCorner(6,7);
+  auto dv_dv_ad = fx_ad.bottomRightCorner(6,6);
+  
+  auto dq_dq = fx.topLeftCorner(7,7);
+  auto dq_dv = fx.topRightCorner(7,6);
+  auto dv_dq = fx.bottomLeftCorner(6,7);
+  auto dv_dv = fx.bottomRightCorner(6,6);
+
+  std::cout << "dq_dq" << std::endl;
+  std::cout << dq_dq_ad << std::endl;
+  std::cout << std::endl;
+  std::cout << dq_dq << std::endl;
+  std::cout << std::endl;
+  std::cout << std::endl;
+  
+  std::cout << "dq_dv" << std::endl;
+  std::cout << dq_dv_ad << std::endl;
+  std::cout << std::endl;
+  std::cout << dq_dv << std::endl;
+  std::cout << std::endl;
+  std::cout << std::endl;
+  
+  std::cout << "dv_dq" << std::endl;
+  std::cout << dv_dq_ad << std::endl;
+  std::cout << std::endl;
+  std::cout << dv_dq << std::endl;
+  std::cout << std::endl;
+  std::cout << std::endl;
+  
+  std::cout << "dv_dv" << std::endl;
+  std::cout << dv_dv_ad << std::endl;
+  std::cout << std::endl;
+  std::cout << dv_dv << std::endl;
+  std::cout << std::endl;
+  std::cout << std::endl;
+  
   return 0;
 }
