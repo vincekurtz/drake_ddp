@@ -12,7 +12,7 @@ import time
 
 # Some simulation parameters 
 T = 5.0
-dt = 1e-2
+dt = 1e-3
 realtime_rate = 0.0
 
 radius = 0.05
@@ -20,7 +20,7 @@ mass = 0.1
 
 dissipation = 0.0              # controls "bounciness" of collisions: lower is bouncier
 hydroelastic_modulus = 5e4     # controls "squishiness" of collisions: lower is squishier
-resolution_hint = 0.05         # smaller means a finer mesh
+resolution_hint = 0.003         # smaller means a finer mesh
 mu = 0.7                       # friction coefficient, same for static and dynamic
 surface_type = HydroelasticContactRepresentation.kPolygon  # Polygon or Triangle
 
@@ -99,7 +99,7 @@ plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
 # Set initial conditions
 q0 = np.array([0,0,0,1,-0.5,0,0.047])
-v0 = np.array([0,0,0,0,0,0.0])
+v0 = np.array([0,0,0,0.05,0,0])
 plant.SetPositions(plant_context, q0)
 plant.SetVelocities(plant_context, v0)
 
@@ -110,6 +110,7 @@ plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
 create_system_model(plant_, scene_graph_)
 system_ = builder_.Build()
 context_ = system_.CreateDefaultContext()
+plant_context_ = system_.GetMutableSubsystemContext(plant_, context_)
 
 # Compute dynamics x_{t+1} = f(x) explicitly
 st = time.time()
@@ -121,7 +122,7 @@ system_.CalcDiscreteVariableUpdates(context_, state)
 et = time.time()-st
 x_next = state.get_vector().value().flatten()
 print("Computed forward dynamics in ",et)
-print("x_next: ", x_next)
+#print("x_next: ", x_next)
 
 # Compute dynamics partials f_x via autodiff
 system_ad = system_.ToAutoDiffXd()
@@ -133,9 +134,15 @@ st = time.time()
 system_ad.CalcDiscreteVariableUpdates(context_ad, state)
 et = time.time()-st
 x_next_ad = state.get_vector().CopyToVector()
-fx = ExtractGradient(x_next_ad)
-print("Computed forward dynamics partials in ",et)
-print("f_x: ",fx)
+fx_ad = ExtractGradient(x_next_ad)
+print("Computed autodiff dynamics partials in ",et)
+
+# Compute dynamics partials f_x via custom approximation
+st = time.time()
+context_.SetDiscreteState(x)
+x_next, fx, fu = plant_.DiscreteDynamicsWithApproximateGradients(plant_context_)
+et = time.time() - st
+print("Computed approximate dynamics partials in ",et)
 #
 #dq_dq = fx[:7,:7]
 #dq_dv = fx[:7,7:]
@@ -150,8 +157,16 @@ print("f_x: ",fx)
 #print("dv_dv: ",np.max(dv_dv))
 #
 import matplotlib.pyplot as plt
+plt.subplot(1,2,1)
+plt.imshow(np.abs(fx_ad), cmap='gray')
+plt.title("autodiff fx")
+
+plt.subplot(1,2,2)
 plt.imshow(np.abs(fx), cmap='gray')
+plt.title("approximate fx")
+
 plt.show()
+
 
 # Simulate the sytem
 #simulator = Simulator(diagram, diagram_context)

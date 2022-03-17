@@ -47,7 +47,7 @@ int main() {
 
   // Plant parameters
   MultibodyPlantConfig config;
-  config.time_step = 1e-3;
+  config.time_step = 1e-2;
   config.contact_model = "hydroelastic";
   config.contact_surface_representation = "polygon";
 
@@ -58,7 +58,7 @@ int main() {
   // Contact parameters
   const double dissipation = 0.0;
   const double hydroelastic_modulus = 5e4;
-  const double resolution_hint = 0.03;
+  const double resolution_hint = 0.003;
   const double mu = 0.7;
   const CoulombFriction<double> surface_friction(mu, mu);
 
@@ -99,7 +99,7 @@ int main() {
   // Set initial conditions
   VectorXd q0(7);
   VectorXd v0(6);
-  q0 << 0, 0, 0, 1, -0.5, 0, 0.047;
+  q0 << 0, 0, 0, -1, -0.5, 0, 0.047;
   v0 << 0, 0, 0, 0.5, 0, 0;
   VectorXd x0(13);
   x0 << q0, v0;
@@ -140,7 +140,7 @@ int main() {
   // Compute approximate dynamics gradients with our method
   Eigen::VectorXd x_next(13);
   Eigen::MatrixXd fx(13,13);
-  Eigen::MatrixXd fu(0,0);
+  Eigen::MatrixXd fu(13,0);
 
   st = std::chrono::high_resolution_clock::now();
   plant.DiscreteDynamicsWithApproximateGradients(plant_context, &x_next, &fx, &fu);
@@ -159,19 +159,19 @@ int main() {
   auto dv_dq = fx.bottomLeftCorner(6,7);
   auto dv_dv = fx.bottomRightCorner(6,6);
 
-  std::cout << "dq_dq" << std::endl;
-  std::cout << dq_dq_ad << std::endl;
-  std::cout << std::endl;
-  std::cout << dq_dq << std::endl;
-  std::cout << std::endl;
-  std::cout << std::endl;
+  //std::cout << "dq_dq" << std::endl;
+  //std::cout << dq_dq_ad << std::endl;
+  //std::cout << std::endl;
+  //std::cout << dq_dq << std::endl;
+  //std::cout << std::endl;
+  //std::cout << std::endl;
   
-  std::cout << "dq_dv" << std::endl;
-  std::cout << dq_dv_ad << std::endl;
-  std::cout << std::endl;
-  std::cout << dq_dv << std::endl;
-  std::cout << std::endl;
-  std::cout << std::endl;
+  //std::cout << "dq_dv" << std::endl;
+  //std::cout << dq_dv_ad << std::endl;
+  //std::cout << std::endl;
+  //std::cout << dq_dv << std::endl;
+  //std::cout << std::endl;
+  //std::cout << std::endl;
   
   std::cout << "dv_dq" << std::endl;
   std::cout << dv_dq_ad << std::endl;
@@ -180,12 +180,12 @@ int main() {
   std::cout << std::endl;
   std::cout << std::endl;
   
-  std::cout << "dv_dv" << std::endl;
-  std::cout << dv_dv_ad << std::endl;
-  std::cout << std::endl;
-  std::cout << dv_dv << std::endl;
-  std::cout << std::endl;
-  std::cout << std::endl;
+  //std::cout << "dv_dv" << std::endl;
+  //std::cout << dv_dv_ad << std::endl;
+  //std::cout << std::endl;
+  //std::cout << dv_dv << std::endl;
+  //std::cout << std::endl;
+  //std::cout << std::endl;
   
   return 0;
 }

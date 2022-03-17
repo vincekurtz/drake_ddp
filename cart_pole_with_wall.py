@@ -17,7 +17,7 @@ from ilqr import IterativeLinearQuadraticRegulator
 
 T = 1.0 
 dt = 1e-2
-playback_rate = 0.2
+playback_rate = 1.0
 
 # Initial state
 x0 = np.array([0,np.pi+0.5,0.0,0])
@@ -107,9 +107,9 @@ diagram = builder.Build()
 diagram_context = diagram.CreateDefaultContext()
 plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
-#####################################
-## Solve Trajectory Optimization
-#####################################
+####################################
+# Solve Trajectory Optimization
+####################################
 
 # Create system model for the solver to use. This system model
 # has a single input port for the control and doesn't include
@@ -163,7 +163,7 @@ while True:
 #####################################
 ## Run Simulation
 #####################################
-
+#
 ## Fix zero input for now
 #plant.get_actuation_input_port().FixValue(plant_context, 0)
 #
