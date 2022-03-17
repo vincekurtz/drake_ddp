@@ -12,7 +12,7 @@ import time
 
 # Some simulation parameters 
 T = 5.0
-dt = 1e-3
+dt = 1e-2
 realtime_rate = 0.0
 
 radius = 0.05
