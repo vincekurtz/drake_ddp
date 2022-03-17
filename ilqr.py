@@ -18,7 +18,8 @@ class IterativeLinearQuadraticRegulator():
     using iLQR.
     """
     def __init__(self, system, num_timesteps, 
-            input_port_index=0, delta=1e-2, beta=0.95, gamma=0.0):
+            input_port_index=0, delta=1e-2, beta=0.95, gamma=0.0,
+            gradient_method="autodiff"):
         """
         Args:
             system:             Drake System describing the discrete-time dynamics
@@ -32,14 +33,22 @@ class IterativeLinearQuadraticRegulator():
                                  linesearch steps. 
             gamma:              Linesearch parameter in [0,1). Higher values mean linesearch
                                  is performed more often in hopes of larger cost reductions.
+            gradient_method:    String specifying how to compute dynamics gradients. Must
+                                 be "autodiff" or "approximate".
         """
         assert system.IsDifferenceEquationSystem()[0],  "must be a discrete-time system"
+        assert gradient_method=="autodiff" or gradient_method=="approximate", "unknown gradient method %s"%gradient_method
 
         # float-type copy of the system and context for linesearch.
         # Computations using this system are fast but don't support gradients
         self.system = system
         self.context = self.system.CreateDefaultContext()
         self.input_port = self.system.get_input_port(input_port_index)
+
+        # Plant subsystem and associated context for approximate dynamics gradients
+        self.plant = self.system.GetSubsystemByName("plant")
+        self.plant_context = self.system.GetMutableSubsystemContext(self.plant, self.context)
+        self.plant_input_port = self.plant.get_actuation_input_port()
 
         # Autodiff copy of the system for computing dynamics gradients
         self.system_ad = system.ToAutoDiffXd()
@@ -51,6 +60,7 @@ class IterativeLinearQuadraticRegulator():
         self.delta = delta
         self.beta = beta
         self.gamma = gamma
+        self.gradient_method = gradient_method
 
         # Define state and input sizes
         self.n = self.context.get_discrete_state_vector().size()
@@ -211,7 +221,7 @@ class IterativeLinearQuadraticRegulator():
         x_next = state.get_vector().value().flatten()
 
         return x_next
-
+    
     def _calc_dynamics_partials(self, x, u):
         """
         Given a system state (x) and a control input (u),
@@ -230,6 +240,30 @@ class IterativeLinearQuadraticRegulator():
                     of f with respect to x.
             fu:     A (n,m) numpy array representing the partial derivative 
                     of f with respect to u.
+        """
+        if self.gradient_method == "autodiff":
+            return self._calc_dynamics_partials_ad(x,u)
+        else:
+            # Use approximate gradients computed by TAMSI
+            self.plant_input_port.FixValue(self.plant_context, u)
+            self.plant.SetPositionsAndVelocities(self.plant_context, x)
+
+            x_next, fx, fu = \
+                self.plant.DiscreteDynamicsWithApproximateGradients(self.plant_context)
+
+            fx_ad, fu_ad = self._calc_dynamics_partials_ad(x,u)
+
+            return (fx,fu)
+
+    def _calc_dynamics_partials_ad(self, x, u):
+        """
+        Compute dynamics partials 
+
+            x_next = f(x,u)
+            fx = partial f(x,u) / partial x
+            fu = partial f(x,u) / partial u
+       
+        using automatic differentiation.
         """
         # Create autodiff versions of x and u
         xu = np.hstack([x,u])
