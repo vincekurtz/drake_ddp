@@ -13,12 +13,12 @@ from ilqr import IterativeLinearQuadraticRegulator
 
 # Choose what to do
 simulate = False   # Run a simple simulation with fixed input
-optimize = False    # Find an optimal trajectory using ilqr
+optimize = True    # Find an optimal trajectory using ilqr
 playback = True    # Visualize the optimal trajectory by playing it back.
                    # If optimize=False, attempts to load a previously saved
                    # trajectory from a file.
 
-scenario = "lift"   # "lift", "forward", or "side"
+scenario = "side"   # "lift", "forward", or "side"
 save_file = "data/" + scenario + ".npz"
 
 ####################################
@@ -270,14 +270,14 @@ if playback:
         data = np.load(save_file)
         timesteps = data["t"]
         states = data["x_bar"]
-        controls = data["u_bar"]
+        inputs = data["u_bar"]
 
     while True:
         # Just keep playing back the trajectory
-        for i in range(len(timesteps)):
+        for i in range(len(timesteps)-1):
             t = timesteps[i]
             x = states[:,i]
-            u = controls[:,i]
+            u = inputs[:,i]
 
             diagram_context.SetTime(t)
             plant.SetPositionsAndVelocities(plant_context, x)

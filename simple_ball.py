@@ -12,7 +12,7 @@ import time
 
 # Some simulation parameters 
 T = 5.0
-dt = 1e-2
+dt = 0
 realtime_rate = 0.0
 
 radius = 0.05
@@ -92,7 +92,7 @@ create_system_model(plant, scene_graph)
 DrakeVisualizer().AddToBuilder(builder, scene_graph)
 ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
-# Finailze the diagram
+# Finalize the diagram
 diagram = builder.Build()
 diagram_context = diagram.CreateDefaultContext()
 plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
@@ -103,81 +103,16 @@ v0 = np.array([0,0,0,0.05,0,0])
 plant.SetPositions(plant_context, q0)
 plant.SetVelocities(plant_context, v0)
 
-# Create a separate system model for autodiff.
-# This is essentially what the iLQR controller will have access to.
-builder_ = DiagramBuilder()
-plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
-create_system_model(plant_, scene_graph_)
-system_ = builder_.Build()
-context_ = system_.CreateDefaultContext()
-plant_context_ = system_.GetMutableSubsystemContext(plant_, context_)
-
-# Compute dynamics x_{t+1} = f(x) explicitly
-st = time.time()
-x = np.hstack([q0, v0])
-context_.SetDiscreteState(x)
-state = context_.get_discrete_state()
-st = time.time()
-system_.CalcDiscreteVariableUpdates(context_, state)
-et = time.time()-st
-x_next = state.get_vector().value().flatten()
-print("Computed forward dynamics in ",et)
-#print("x_next: ", x_next)
-
-# Compute dynamics partials f_x via autodiff
-system_ad = system_.ToAutoDiffXd()
-context_ad = system_ad.CreateDefaultContext()
-x_ad = InitializeAutoDiff(x)
-context_ad.SetDiscreteState(x_ad)
-state = context_ad.get_discrete_state()
-st = time.time()
-system_ad.CalcDiscreteVariableUpdates(context_ad, state)
-et = time.time()-st
-x_next_ad = state.get_vector().CopyToVector()
-fx_ad = ExtractGradient(x_next_ad)
-print("Computed autodiff dynamics partials in ",et)
-
-# Compute dynamics partials f_x via custom approximation
-st = time.time()
-context_.SetDiscreteState(x)
-x_next, fx, fu = plant_.DiscreteDynamicsWithApproximateGradients(plant_context_)
-et = time.time() - st
-print("Computed approximate dynamics partials in ",et)
-#
-#dq_dq = fx[:7,:7]
-#dq_dv = fx[:7,7:]
-#dv_dq = fx[7:,:7]
-#dv_dv = fx[7:,7:]
-#
-#np.set_printoptions(formatter={'float': lambda x: "{0:0.8f}".format(x)})
-#print(dv_dv)
-#print("dq_dq: ",np.max(dq_dq))
-#print("dq_dv: ",np.max(dq_dv))
-#print("dv_dq: ",np.max(dv_dq))
-#print("dv_dv: ",np.max(dv_dv))
-#
-import matplotlib.pyplot as plt
-plt.subplot(1,2,1)
-plt.imshow(np.abs(fx_ad), cmap='gray')
-plt.title("autodiff fx")
-
-plt.subplot(1,2,2)
-plt.imshow(np.abs(fx), cmap='gray')
-plt.title("approximate fx")
-
-plt.show()
-
-
 # Simulate the sytem
-#simulator = Simulator(diagram, diagram_context)
-#
-#print(GetIntegrationSchemes())
-#ResetIntegratorFromFlags(simulator, "implicit_euler", 5e-3)
-#
-#simulator.Initialize()
-#integrator = simulator.get_integrator()
-#print(integrator)
-#integrator.set_fixed_step_mode(True)
-#print(integrator.get_fixed_step_mode())
-#simulator.set_target_realtime_rate(realtime_rate)
-#simulator.AdvanceTo(T)
+simulator = Simulator(diagram, diagram_context)
+
+print(GetIntegrationSchemes())
+ResetIntegratorFromFlags(simulator, "implicit_euler", 1e-2)
+
+simulator.Initialize()
+integrator = simulator.get_integrator()
+print(integrator)
+integrator.set_fixed_step_mode(True)
+print(integrator.get_fixed_step_mode())
+simulator.set_target_realtime_rate(realtime_rate)
+simulator.AdvanceTo(T)

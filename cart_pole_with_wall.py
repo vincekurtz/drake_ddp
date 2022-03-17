@@ -15,12 +15,12 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 0.001
-dt = 1e-3
+T = 1.0
+dt = 1e-2
 playback_rate = 1.0
 
 # Initial state
-x0 = np.array([-0.18,np.pi+0.5,0.0,0])
+x0 = np.array([0,np.pi+0.5,0.0,0])
 
 # Target state
 x_nom = np.array([0,np.pi,0,0])
@@ -120,105 +120,62 @@ plant_ = create_system_model(plant_)
 builder_.ExportInput(plant_.get_actuation_input_port(), "control")
 system_ = builder_.Build()
 
-# DEBUG ##########################
-# Test dynamics gradients
-u0 = 0
-context_ = system_.CreateDefaultContext()
-plant_context_ = system_.GetMutableSubsystemContext(plant_, context_)
+# Set up the optimizer
+num_steps = int(T/dt)
+ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5)
 
-plant_.get_actuation_input_port().FixValue(plant_context_, u0)
-plant_.SetPositionsAndVelocities(plant_context_, x0)
-st = time.time()
-x_next, fx, fu = plant_.DiscreteDynamicsWithApproximateGradients(plant_context_)
-print("Approximate took ", time.time()-st)
-print(x_next)
-print(fx)
-print(fu)
-print("")
+# Define the optimization problem
+ilqr.SetInitialState(x0)
+ilqr.SetTargetState(x_nom)
+ilqr.SetRunningCost(dt*Q, dt*R)
+ilqr.SetTerminalCost(Qf)
 
-system_ad = system_.ToAutoDiffXd()
-context_ad = system_ad.CreateDefaultContext()
-plant_ad = system_ad.GetSubsystemByName("plant")
-plant_context_ad = system_ad.GetMutableSubsystemContext(plant_ad, context_ad)
-xu_ad = InitializeAutoDiff(np.hstack([x0,u0]))
-x_ad = xu_ad[:4]
-u_ad = xu_ad[4:]
-plant_ad.get_actuation_input_port().FixValue(plant_context_ad, u_ad)
-plant_ad.SetPositionsAndVelocities(plant_context_ad, x_ad)
-state = context_ad.get_discrete_state()
-st = time.time()
-system_ad.CalcDiscreteVariableUpdates(context_ad, state)
-print("Autodiff took ", time.time()-st)
-x_next_ad = state.get_vector().CopyToVector()
-G = ExtractGradient(x_next_ad)
-fx_ad = G[:,:4]
-fu_ad = G[:,4:]
-x_next_ad = ExtractValue(x_next_ad).flatten()
-print(x_next_ad)
-print(fx_ad)
-print(fu_ad)
+# Set initial guess
+#np.random.seed(0)
+#u_guess = 0.01*np.random.normal(size=(1,num_steps-1))
+u_guess = np.zeros((1,num_steps-1))
+ilqr.SetInitialGuess(u_guess)
 
-#
-## Set up the optimizer
-#num_steps = int(T/dt)
-#ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5)
-#
-## Define the optimization problem
-#ilqr.SetInitialState(x0)
-#ilqr.SetTargetState(x_nom)
-#ilqr.SetRunningCost(dt*Q, dt*R)
-#ilqr.SetTerminalCost(Qf)
-#
-## Set initial guess
-##np.random.seed(0)
-##u_guess = 0.01*np.random.normal(size=(1,num_steps-1))
-#u_guess = np.zeros((1,num_steps-1))
-#ilqr.SetInitialGuess(u_guess)
-#
-## Solve the optimization problem
-#states, inputs, solve_time, optimal_cost = ilqr.Solve()
-#print(f"Solved in {solve_time} seconds using iLQR")
-#print(f"Optimal cost: {optimal_cost}")
-#timesteps = np.arange(0.0,T,dt)
-
-# DEBUG ##########################
-# Test dynamics gradients
-##################################
+# Solve the optimization problem
+states, inputs, solve_time, optimal_cost = ilqr.Solve()
+print(f"Solved in {solve_time} seconds using iLQR")
+print(f"Optimal cost: {optimal_cost}")
+timesteps = np.arange(0.0,T,dt)
 
 # Set initial conditions
 plant.get_actuation_input_port().FixValue(plant_context, 0)
 plant.SetPositionsAndVelocities(plant_context, x0)
 
-######################################
-## Playback
-######################################
+#####################################
+# Playback
+#####################################
+
+while True:
+    plant.get_actuation_input_port().FixValue(plant_context, 0)
+    # Just keep playing back the trajectory
+    for i in range(len(timesteps)):
+        t = timesteps[i]
+        x = states[:,i]
+
+        diagram_context.SetTime(t)
+        plant.SetPositionsAndVelocities(plant_context, x)
+        diagram.Publish(diagram_context)
+
+        time.sleep(1/playback_rate*dt-4e-4)
+    time.sleep(1)
+
+#####################################
+## Run Simulation
+#####################################
 #
-#while True:
-#    plant.get_actuation_input_port().FixValue(plant_context, 0)
-#    # Just keep playing back the trajectory
-#    for i in range(len(timesteps)):
-#        t = timesteps[i]
-#        x = states[:,i]
+## Fix zero input for now
+#plant.get_actuation_input_port().FixValue(plant_context, 0)
 #
-#        diagram_context.SetTime(t)
-#        plant.SetPositionsAndVelocities(plant_context, x)
-#        diagram.Publish(diagram_context)
+## Set initial state
+#plant.SetPositionsAndVelocities(plant_context, x0)
 #
-#        time.sleep(1/playback_rate*dt-4e-4)
-#    time.sleep(1)
-
-####################################
-# Run Simulation
-####################################
-
-# Fix zero input for now
-plant.get_actuation_input_port().FixValue(plant_context, 0)
-
-# Set initial state
-plant.SetPositionsAndVelocities(plant_context, x0)
-
-# Simulate the system
-simulator = Simulator(diagram, diagram_context)
-simulator.set_target_realtime_rate(playback_rate)
-
-simulator.AdvanceTo(T)
+## Simulate the system
+#simulator = Simulator(diagram, diagram_context)
+#simulator.set_target_realtime_rate(playback_rate)
+#
+#simulator.AdvanceTo(T)
