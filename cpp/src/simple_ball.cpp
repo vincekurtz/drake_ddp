@@ -137,27 +137,34 @@ int main() {
   auto x_next_ad = update_ad->get_mutable_value();
   auto fx_ad = ExtractGradient(x_next_ad);
 
-  // Compute approximate dynamics gradients with our method
-  Eigen::VectorXd x_next(13);
-  Eigen::MatrixXd fx(13,13);
-  Eigen::MatrixXd fu(13,0);
+  // DEBUG: get gravity gradient (partial tau_g) / (partial q)
+  auto plant_ad = plant.ToAutoDiffXd();
+  auto plant_context_ad = plant_ad->CreateDefaultContext();
+  x_ad = InitializeAutoDiff(x0);
+  plant_ad.SetPositionsAndVelocities(&plant_context_ad, x_ad);
+  //plant.SetPositionsAndVelocities(&plant_context, x0);
 
-  st = std::chrono::high_resolution_clock::now();
-  plant.DiscreteDynamicsWithApproximateGradients(plant_context, &x_next, &fx, &fu);
-  et = std::chrono::high_resolution_clock::now();
-  elapsed = et - st;
-  std::cout << "Computed forward dynamics with approx gradient in " << elapsed.count() << "s" << std::endl;
+  // Compute approximate dynamics gradients with our method
+  //Eigen::VectorXd x_next(13);
+  //Eigen::MatrixXd fx(13,13);
+  //Eigen::MatrixXd fu(13,0);
+
+  //st = std::chrono::high_resolution_clock::now();
+  //plant.DiscreteDynamicsWithApproximateGradients(plant_context, &x_next, &fx, &fu);
+  //et = std::chrono::high_resolution_clock::now();
+  //elapsed = et - st;
+  //std::cout << "Computed forward dynamics with approx gradient in " << elapsed.count() << "s" << std::endl;
  
-  // Compare autodiff and approximate gradients
-  auto dq_dq_ad = fx_ad.topLeftCorner(7,7);
-  auto dq_dv_ad = fx_ad.topRightCorner(7,6);
-  auto dv_dq_ad = fx_ad.bottomLeftCorner(6,7);
-  auto dv_dv_ad = fx_ad.bottomRightCorner(6,6);
-  
-  auto dq_dq = fx.topLeftCorner(7,7);
-  auto dq_dv = fx.topRightCorner(7,6);
-  auto dv_dq = fx.bottomLeftCorner(6,7);
-  auto dv_dv = fx.bottomRightCorner(6,6);
+  //// Compare autodiff and approximate gradients
+  //auto dq_dq_ad = fx_ad.topLeftCorner(7,7);
+  //auto dq_dv_ad = fx_ad.topRightCorner(7,6);
+  //auto dv_dq_ad = fx_ad.bottomLeftCorner(6,7);
+  //auto dv_dv_ad = fx_ad.bottomRightCorner(6,6);
+  //
+  //auto dq_dq = fx.topLeftCorner(7,7);
+  //auto dq_dv = fx.topRightCorner(7,6);
+  //auto dv_dq = fx.bottomLeftCorner(6,7);
+  //auto dv_dv = fx.bottomRightCorner(6,6);
 
   //std::cout << "dq_dq" << std::endl;
   //std::cout << dq_dq_ad << std::endl;
@@ -173,12 +180,12 @@ int main() {
   //std::cout << std::endl;
   //std::cout << std::endl;
   
-  std::cout << "dv_dq" << std::endl;
-  std::cout << dv_dq_ad << std::endl;
-  std::cout << std::endl;
-  std::cout << dv_dq << std::endl;
-  std::cout << std::endl;
-  std::cout << std::endl;
+  //std::cout << "dv_dq" << std::endl;
+  //std::cout << dv_dq_ad << std::endl;
+  //std::cout << std::endl;
+  //std::cout << dv_dq << std::endl;
+  //std::cout << std::endl;
+  //std::cout << std::endl;
   
   //std::cout << "dv_dv" << std::endl;
   //std::cout << dv_dv_ad << std::endl;

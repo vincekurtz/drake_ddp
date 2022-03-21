@@ -12,9 +12,9 @@ from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
 
 # Choose what to do
-simulate = False   # Run a simple simulation with fixed input
-optimize = True    # Find an optimal trajectory using ilqr
-playback = True    # Visualize the optimal trajectory by playing it back.
+simulate = True   # Run a simple simulation with fixed input
+optimize = False    # Find an optimal trajectory using ilqr
+playback = False    # Visualize the optimal trajectory by playing it back.
                    # If optimize=False, attempts to load a previously saved
                    # trajectory from a file.
 
@@ -25,9 +25,9 @@ save_file = "data/" + scenario + ".npz"
 # Parameters
 ####################################
 
-T = 0.5
-dt = 1e-2
-playback_rate = 0.125
+T = 1.0
+dt = 0
+playback_rate = 0.0
 
 # Some useful joint angle definitions
 q_home = np.pi/180*np.array([0, 15, 180, 230, 0, 55, 90])
@@ -304,8 +304,21 @@ if simulate:
     plant.SetPositionsAndVelocities(plant_context, x0)
 
     # Simulate the system
+    sim_config = SimulatorConfig()
+    sim_config.integration_scheme = "implicit_euler"
+    sim_config.accuracy = 0.0
+    sim_config.max_step_size = 1e-2
+    sim_config.use_error_control = False
+    
+    sim_config.target_realtime_rate = playback_rate
+    sim_config.publish_every_time_step = True
+
     simulator = Simulator(diagram, diagram_context)
-    simulator.set_target_realtime_rate(playback_rate)
-    simulator.set_publish_every_time_step(True)
+    ApplySimulatorConfig(simulator, sim_config)
+    #simulator.set_target_realtime_rate(playback_rate)
+    #simulator.set_publish_every_time_step(True)
+
+    integrator = simulator.get_integrator()
+    integrator.set_requested_minimum_step_size(1e-3)
 
     simulator.AdvanceTo(T)
