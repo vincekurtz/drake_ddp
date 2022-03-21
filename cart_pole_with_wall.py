@@ -20,7 +20,7 @@ dt = 1e-2
 playback_rate = 1.0
 
 # Initial state
-x0 = np.array([0,np.pi+0.5,0.0,0])
+x0 = np.array([0.0,np.pi+0.5,0.0,0])
 
 # Target state
 x_nom = np.array([0,np.pi,0,0])
@@ -119,6 +119,45 @@ plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
 plant_ = create_system_model(plant_)
 builder_.ExportInput(plant_.get_actuation_input_port(), "control")
 system_ = builder_.Build()
+
+
+# DEBUG ##########################
+# Test dynamics gradients
+#u0 = 0
+#context_ = system_.CreateDefaultContext()
+#plant_context_ = system_.GetMutableSubsystemContext(plant_, context_)
+#
+#plant_.get_actuation_input_port().FixValue(plant_context_, u0)
+#plant_.SetPositionsAndVelocities(plant_context_, x0)
+#st = time.time()
+#x_next, fx, fu = plant_.DiscreteDynamicsWithApproximateGradients(plant_context_)
+#print("Approximate took ", time.time()-st)
+#print(x_next)
+#print(fx)
+#print(fu)
+#print("")
+#
+#system_ad = system_.ToAutoDiffXd()
+#context_ad = system_ad.CreateDefaultContext()
+#plant_ad = system_ad.GetSubsystemByName("plant")
+#plant_context_ad = system_ad.GetMutableSubsystemContext(plant_ad, context_ad)
+#xu_ad = InitializeAutoDiff(np.hstack([x0,u0]))
+#x_ad = xu_ad[:4]
+#u_ad = xu_ad[4:]
+#plant_ad.get_actuation_input_port().FixValue(plant_context_ad, u_ad)
+#plant_ad.SetPositionsAndVelocities(plant_context_ad, x_ad)
+#state = context_ad.get_discrete_state()
+#st = time.time()
+#system_ad.CalcDiscreteVariableUpdates(context_ad, state)
+#print("Autodiff took ", time.time()-st)
+#x_next_ad = state.get_vector().CopyToVector()
+#G = ExtractGradient(x_next_ad)
+#fx_ad = G[:,:4]
+#fu_ad = G[:,4:]
+#x_next_ad = ExtractValue(x_next_ad).flatten()
+#print(x_next_ad)
+#print(fx_ad)
+#print(fu_ad)
 
 # Set up the optimizer
 num_steps = int(T/dt)

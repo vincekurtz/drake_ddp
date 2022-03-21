@@ -138,10 +138,15 @@ int main() {
   auto fx_ad = ExtractGradient(x_next_ad);
 
   // DEBUG: get gravity gradient (partial tau_g) / (partial q)
-  auto plant_ad = plant.ToAutoDiffXd();
+  std::unique_ptr<MultibodyPlant<AutoDiffXd>> plant_ad = 
+    systems::System<double>::ToAutoDiffXd(plant);
+  //auto plant_ad = plant.ToAutoDiffXd();
   auto plant_context_ad = plant_ad->CreateDefaultContext();
-  x_ad = InitializeAutoDiff(x0);
-  plant_ad.SetPositionsAndVelocities(&plant_context_ad, x_ad);
+  plant_ad->SetPositionsAndVelocities(plant_context_ad.get(), x_ad);
+  auto tau_g = plant_ad->CalcGravityGeneralizedForces(*plant_context_ad);
+
+  std::cout << tau_g << std::endl;
+  std::cout << ExtractGradient(tau_g) << std::endl;
   //plant.SetPositionsAndVelocities(&plant_context, x0);
 
   // Compute approximate dynamics gradients with our method

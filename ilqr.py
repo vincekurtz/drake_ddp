@@ -45,6 +45,10 @@ class IterativeLinearQuadraticRegulator():
         self.system_ad = system.ToAutoDiffXd()
         self.context_ad = self.system_ad.CreateDefaultContext()
         self.input_port_ad = self.system_ad.get_input_port(input_port_index)
+
+        # DEBUG
+        self.plant = self.system.GetSubsystemByName("plant")
+        self.plant_context = self.system.GetMutableSubsystemContext(self.plant, self.context)
        
         # Set some parameters
         self.N = num_timesteps
@@ -222,25 +226,29 @@ class IterativeLinearQuadraticRegulator():
        
         using automatic differentiation.
         """
-        # Create autodiff versions of x and u
-        xu = np.hstack([x,u])
-        xu_ad = InitializeAutoDiff(xu)
-        x_ad = xu_ad[:self.n]
-        u_ad = xu_ad[self.n:]
+        ## Create autodiff versions of x and u
+        #xu = np.hstack([x,u])
+        #xu_ad = InitializeAutoDiff(xu)
+        #x_ad = xu_ad[:self.n]
+        #u_ad = xu_ad[self.n:]
 
-        # Set input and state variables in our stored model accordingly
-        self.context_ad.SetDiscreteState(x_ad)
-        self.input_port_ad.FixValue(self.context_ad, u_ad)
+        ## Set input and state variables in our stored model accordingly
+        #self.context_ad.SetDiscreteState(x_ad)
+        #self.input_port_ad.FixValue(self.context_ad, u_ad)
 
-        # Compute the forward dynamics x_next = f(x,u)
-        state = self.context_ad.get_discrete_state()
-        self.system_ad.CalcDiscreteVariableUpdates(self.context_ad, state)
-        x_next = state.get_vector().CopyToVector()
+        ## Compute the forward dynamics x_next = f(x,u)
+        #state = self.context_ad.get_discrete_state()
+        #self.system_ad.CalcDiscreteVariableUpdates(self.context_ad, state)
+        #x_next = state.get_vector().CopyToVector()
        
-        # Compute partial derivatives
-        G = ExtractGradient(x_next)
-        fx = G[:,:self.n]
-        fu = G[:,self.n:]
+        ## Compute partial derivatives
+        #G = ExtractGradient(x_next)
+        #fx = G[:,:self.n]
+        #fu = G[:,self.n:]
+
+        # DEBUG
+        x_next, fx, fu = \
+                self.plant.DiscreteDynamicsWithApproximateGradients(self.plant_context)
 
         return (fx, fu)
 
