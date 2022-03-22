@@ -18,10 +18,10 @@ from ilqr import IterativeLinearQuadraticRegulator
 T = 0.2
 dt = 5e-3
 playback_rate = 0.2
-target_vel = 1.00   # m/s
+target_vel = 0.50   # m/s
 
 # MPC parameters
-num_resolves = 100  # total number of times to resolve the optimizaiton problem
+num_resolves = 20  # total number of times to resolve the optimizaiton problem
 replan_steps = 4    # number of timesteps after which to move the horizon and
                     # re-solve the MPC problem (>0)
 
@@ -60,8 +60,7 @@ Qf = np.diag(np.hstack([5*Qq_base,0.1+Qq_legs,Qv_base,Qv_legs]))
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
 mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 
-mu_static = 0.6
-mu_dynamic = 0.5
+mu = 0.5
 
 dissipation = 0
 hydroelastic_modulus = 5e6
@@ -80,7 +79,7 @@ def create_system_model(plant):
     # Add a ground with compliant hydroelastic contact
     ground_props = ProximityProperties()
     AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus,ground_props)
-    friction = CoulombFriction(mu_static, mu_dynamic)
+    friction = CoulombFriction(mu, mu)
     AddContactMaterial(dissipation=dissipation, friction=friction, properties=ground_props)
     X_ground = RigidTransform()
     X_ground.set_translation([0,0,-0.5])

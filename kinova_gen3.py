@@ -12,9 +12,9 @@ from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
 
 # Choose what to do
-simulate = True   # Run a simple simulation with fixed input
-optimize = False    # Find an optimal trajectory using ilqr
-playback = False    # Visualize the optimal trajectory by playing it back.
+simulate = False   # Run a simple simulation with fixed input
+optimize = True    # Find an optimal trajectory using ilqr
+playback = True    # Visualize the optimal trajectory by playing it back.
                    # If optimize=False, attempts to load a previously saved
                    # trajectory from a file.
 
@@ -26,8 +26,8 @@ save_file = "data/" + scenario + ".npz"
 ####################################
 
 T = 1.0
-dt = 0
-playback_rate = 0.0
+dt = 1e-2
+playback_rate = 0.2
 
 # Some useful joint angle definitions
 q_home = np.pi/180*np.array([0, 15, 180, 230, 0, 55, 90])

@@ -273,10 +273,6 @@ class IterativeLinearQuadraticRegulator():
             u:          (m,N-1) numpy array of new control inputs
             L:          Total cost/loss associated with the new trajectory
             n_iters:    Number of linesearch iterations taken
-
-        Raises:
-            RuntimeError: if eps has been reduced to <1e-8 and we still
-                           haven't found a suitable parameter.
         """
         eps = 1.0
         n_iters = 0
@@ -315,7 +311,8 @@ class IterativeLinearQuadraticRegulator():
             # Otherwise reduce eps by a factor of beta
             eps *= self.beta
 
-        raise RuntimeError("linesearch failed after %s iterations"%n_iters)
+        print(f"Warning: terminating linesearch after {n_iters} iterations")
+        return eps, x, u, L, n_iters
     
     def _forward_pass(self, L_last):
         """
