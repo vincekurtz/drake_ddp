@@ -20,7 +20,7 @@ dt = 1e-2
 playback_rate = 1.0
 
 # Initial state
-x0 = np.array([0.0,np.pi+0.5,0.0,0])
+x0 = np.array([-0.1,np.pi+0.5,0,0])
 
 # Target state
 x_nom = np.array([0,np.pi,0,0])
@@ -31,10 +31,10 @@ R = 0.001*np.eye(1)
 Qf = np.diag([200,200,10,10])
 
 # Contact model parameters
-dissipation = 0.0              # controls "bounciness" of collisions: lower is bouncier
+dissipation = 1.0              # controls "bounciness" of collisions: lower is bouncier
 hydroelastic_modulus = 2e5     # controls "squishiness" of collisions: lower is squishier
 resolution_hint = 0.05         # smaller means a finer mesh
-penetration_allowance = 0.2    # controls "softenss" of collisions for point contact model
+penetration_allowance = 0.1    # controls "softenss" of collisions for point contact model
 mu = 0.5                       # friction coefficient
 
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
@@ -65,13 +65,13 @@ def create_system_model(plant):
     plant.RegisterVisualGeometry(pole, X_BP, Sphere(radius), "visual", orange)
     
     # Add a wall with rigid hydroelastic contact
-    l,w,h = (0.1,1,2)   
+    l,w,h = (0.1,0.5,0.5)   
     I_W = SpatialInertia(1, np.zeros(3), UnitInertia.SolidBox(l,w,h))
     wall_instance = plant.AddModelInstance("wall")
     wall = plant.AddRigidBody("wall", wall_instance, I_W)
     wall_frame = plant.GetFrameByName("wall", wall_instance)
     X_W = RigidTransform()
-    X_W.set_translation([-0.5,0,0])
+    X_W.set_translation([-0.5,0,0.5])
     plant.WeldFrames(plant.world_frame(), wall_frame, X_W)
     
     plant.RegisterVisualGeometry(wall, RigidTransform(), Box(l,w,h), "wall_visual", orange)
@@ -121,48 +121,9 @@ plant_ = create_system_model(plant_)
 builder_.ExportInput(plant_.get_actuation_input_port(), "control")
 system_ = builder_.Build()
 
-
-# DEBUG ##########################
-# Test dynamics gradients
-#u0 = 0
-#context_ = system_.CreateDefaultContext()
-#plant_context_ = system_.GetMutableSubsystemContext(plant_, context_)
-#
-#plant_.get_actuation_input_port().FixValue(plant_context_, u0)
-#plant_.SetPositionsAndVelocities(plant_context_, x0)
-#st = time.time()
-#x_next, fx, fu = plant_.DiscreteDynamicsWithApproximateGradients(plant_context_)
-#print("Approximate took ", time.time()-st)
-#print(x_next)
-#print(fx)
-#print(fu)
-#print("")
-#
-#system_ad = system_.ToAutoDiffXd()
-#context_ad = system_ad.CreateDefaultContext()
-#plant_ad = system_ad.GetSubsystemByName("plant")
-#plant_context_ad = system_ad.GetMutableSubsystemContext(plant_ad, context_ad)
-#xu_ad = InitializeAutoDiff(np.hstack([x0,u0]))
-#x_ad = xu_ad[:4]
-#u_ad = xu_ad[4:]
-#plant_ad.get_actuation_input_port().FixValue(plant_context_ad, u_ad)
-#plant_ad.SetPositionsAndVelocities(plant_context_ad, x_ad)
-#state = context_ad.get_discrete_state()
-#st = time.time()
-#system_ad.CalcDiscreteVariableUpdates(context_ad, state)
-#print("Autodiff took ", time.time()-st)
-#x_next_ad = state.get_vector().CopyToVector()
-#G = ExtractGradient(x_next_ad)
-#fx_ad = G[:,:4]
-#fu_ad = G[:,4:]
-#x_next_ad = ExtractValue(x_next_ad).flatten()
-#print(x_next_ad)
-#print(fx_ad)
-#print(fu_ad)
-
 # Set up the optimizer
 num_steps = int(T/dt)
-ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5)
+ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, autodiff=False)
 
 # Define the optimization problem
 ilqr.SetInitialState(x0)

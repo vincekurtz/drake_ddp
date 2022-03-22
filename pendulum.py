@@ -41,6 +41,7 @@ def create_system_model(plant):
     urdf = FindResourceOrThrow("drake/examples/pendulum/Pendulum.urdf")
     robot = Parser(plant=plant).AddModelFromFile(urdf)
     plant.Finalize()
+    plant.set_name("plant")
     return plant
 
 ####################################
@@ -71,19 +72,21 @@ plant_context = diagram.GetMutableSubsystemContext(
 #####################################
 
 # Create system model for the solver to use
-plant_ = MultibodyPlant(dt)
+builder_ = DiagramBuilder()
+plant_ = builder_.AddSystem(MultibodyPlant(dt))
 plant_ = create_system_model(plant_)
-input_port_index = plant_.get_actuation_input_port().get_index()
+builder_.ExportInput(plant_.get_actuation_input_port(),"control")
+system_ = builder_.Build()
 
 #-----------------------------------------
-# DDP method
+# iLQR method
 #-----------------------------------------
 
 if method == "ilqr":
     # Set up the optimizer
     num_steps = int(T/dt)
-    ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
-            input_port_index=input_port_index)
+    ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
+            autodiff=False)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)
@@ -108,6 +111,7 @@ if method == "ilqr":
 
 elif method == "sqp":
     context_ = plant_.CreateDefaultContext()
+    input_port_index = plant_.get_actuation_input_port().get_index()
 
     # Set up the solver object
     trajopt = DirectTranscription(

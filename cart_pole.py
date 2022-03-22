@@ -23,7 +23,7 @@ dt = 1e-2      # simulation timestep
 method = "ilqr"
 
 # Initial state
-x0 = np.array([0,np.pi-0.1,0,0])
+x0 = np.array([0.0,np.pi,0.5,0])
 
 # Target state
 x_nom = np.array([0,np.pi,0,0])
@@ -41,6 +41,7 @@ def create_system_model(plant):
     sdf = FindResourceOrThrow("drake/examples/multibody/cart_pole/cart_pole.sdf")
     robot = Parser(plant=plant).AddModelFromFile(sdf)
     plant.Finalize()
+    plant.set_name("plant")
     return plant
 
 ####################################
@@ -69,20 +70,21 @@ plant_context = diagram.GetMutableSubsystemContext(
 #####################################
     
 # Create system model for controller
-plant_ = MultibodyPlant(dt)
+builder_ = DiagramBuilder()
+plant_ = builder_.AddSystem(MultibodyPlant(dt))
 plant_ = create_system_model(plant_)
-input_port_index = plant_.get_actuation_input_port().get_index()
+builder_.ExportInput(plant_.get_actuation_input_port(), "control")
+system_ = builder_.Build()
 
 #-----------------------------------------
-# DDP method
+# iLQR method
 #-----------------------------------------
 
 if method == "ilqr":
     # Set up the optimizer
     num_steps = int(T/dt)
-    ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
-            input_port_index=input_port_index,
-            beta=0.9)
+    ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
+            beta=0.9, autodiff=False)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)
@@ -106,12 +108,13 @@ if method == "ilqr":
 #-----------------------------------------
 
 elif method == "sqp":
-    context_ = plant_.CreateDefaultContext()
+    context_ = system_.GetMutableSubsystemContext(plant_, 
+            system_.CreateDefaultContext())
 
     # Set up the solver object
     trajopt = DirectTranscription(
             plant_, context_, 
-            input_port_index=input_port_index,
+            input_port_index = plant_.get_actuation_input_port().get_index(),
             num_time_samples=int(T/dt))
     
     # Add constraints

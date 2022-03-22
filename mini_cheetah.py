@@ -142,7 +142,7 @@ def solve_ilqr(solver, x0, u_guess, move_target=False):
 # Set up the optimizer
 num_steps = int(T/dt)
 ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-        beta=0.5, delta=1e-2, gamma=0)
+        beta=0.5, delta=1e-2, gamma=0, autodiff=False)
 
 # Define the optimization problem
 ilqr.SetTargetState(x_nom)

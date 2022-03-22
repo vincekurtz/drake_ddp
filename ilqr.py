@@ -18,7 +18,8 @@ class IterativeLinearQuadraticRegulator():
     using iLQR.
     """
     def __init__(self, system, num_timesteps, 
-            input_port_index=0, delta=1e-2, beta=0.95, gamma=0.0):
+            input_port_index=0, delta=1e-2, beta=0.95, gamma=0.0,
+            autodiff=False):
         """
         Args:
             system:             Drake System describing the discrete-time dynamics
@@ -32,6 +33,9 @@ class IterativeLinearQuadraticRegulator():
                                  linesearch steps. 
             gamma:              Linesearch parameter in [0,1). Higher values mean linesearch
                                  is performed more often in hopes of larger cost reductions.
+            autodiff:           Boolean indicating whether to use automatic differentiation
+                                 to compute dynamics gradients. If False, we use a (faster) 
+                                 custom approximation of the gradients instead.
         """
         assert system.IsDifferenceEquationSystem()[0],  "must be a discrete-time system"
 
@@ -41,20 +45,24 @@ class IterativeLinearQuadraticRegulator():
         self.context = self.system.CreateDefaultContext()
         self.input_port = self.system.get_input_port(input_port_index)
 
-        # Autodiff copy of the system for computing dynamics gradients
-        self.system_ad = system.ToAutoDiffXd()
-        self.context_ad = self.system_ad.CreateDefaultContext()
-        self.input_port_ad = self.system_ad.get_input_port(input_port_index)
+        if autodiff:
+            # Make an autodiff copy of the system for computing dynamics gradients
+            self.system_ad = system.ToAutoDiffXd()
+            self.context_ad = self.system_ad.CreateDefaultContext()
+            self.input_port_ad = self.system_ad.get_input_port(input_port_index)
+        else:
+            # Extract the MultibodyPlant model from the given system. 
+            # The system in this case must include a MultibodyPlant called "plant"
+            # which is attached to a corresponding scene graph (for geometry computations)
+            self.plant = self.system.GetSubsystemByName("plant")
+            self.plant_context = self.system.GetMutableSubsystemContext(self.plant, self.context)
 
-        # DEBUG
-        self.plant = self.system.GetSubsystemByName("plant")
-        self.plant_context = self.system.GetMutableSubsystemContext(self.plant, self.context)
-       
         # Set some parameters
         self.N = num_timesteps
         self.delta = delta
         self.beta = beta
         self.gamma = gamma
+        self.autodiff = autodiff
 
         # Define state and input sizes
         self.n = self.context.get_discrete_state_vector().size()
@@ -226,29 +234,32 @@ class IterativeLinearQuadraticRegulator():
        
         using automatic differentiation.
         """
-        ## Create autodiff versions of x and u
-        #xu = np.hstack([x,u])
-        #xu_ad = InitializeAutoDiff(xu)
-        #x_ad = xu_ad[:self.n]
-        #u_ad = xu_ad[self.n:]
+        if self.autodiff:
+            # Create autodiff versions of x and u
+            xu = np.hstack([x,u])
+            xu_ad = InitializeAutoDiff(xu)
+            x_ad = xu_ad[:self.n]
+            u_ad = xu_ad[self.n:]
 
-        ## Set input and state variables in our stored model accordingly
-        #self.context_ad.SetDiscreteState(x_ad)
-        #self.input_port_ad.FixValue(self.context_ad, u_ad)
+            # Set input and state variables in our stored model accordingly
+            self.context_ad.SetDiscreteState(x_ad)
+            self.input_port_ad.FixValue(self.context_ad, u_ad)
 
-        ## Compute the forward dynamics x_next = f(x,u)
-        #state = self.context_ad.get_discrete_state()
-        #self.system_ad.CalcDiscreteVariableUpdates(self.context_ad, state)
-        #x_next = state.get_vector().CopyToVector()
-       
-        ## Compute partial derivatives
-        #G = ExtractGradient(x_next)
-        #fx = G[:,:self.n]
-        #fu = G[:,self.n:]
+            # Compute the forward dynamics x_next = f(x,u)
+            state = self.context_ad.get_discrete_state()
+            self.system_ad.CalcDiscreteVariableUpdates(self.context_ad, state)
+            x_next = state.get_vector().CopyToVector()
+           
+            # Compute partial derivatives
+            G = ExtractGradient(x_next)
+            fx = G[:,:self.n]
+            fu = G[:,self.n:]
 
-        # DEBUG
-        x_next, fx, fu = \
-                self.plant.DiscreteDynamicsWithApproximateGradients(self.plant_context)
+        else:
+            # Use our custom dynamics gradient approximation, which exploits
+            # the structure of the TAMSI time-stepper.
+            x_next, fx, fu = \
+                    self.plant.DiscreteDynamicsWithApproximateGradients(self.plant_context)
 
         return (fx, fu)
 

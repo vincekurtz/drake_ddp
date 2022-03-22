@@ -42,6 +42,7 @@ def create_system_model(plant):
     urdf = FindResourceOrThrow("drake/examples/acrobot/Acrobot.urdf")
     robot = Parser(plant=plant).AddModelFromFile(urdf)
     plant.Finalize()
+    plant.set_name("plant")
     return plant
 
 ####################################
@@ -70,9 +71,11 @@ plant_context = diagram.GetMutableSubsystemContext(
 #####################################
 
 # System model for the trajectory optimizer
-plant_ = MultibodyPlant(dt)
+builder_ = DiagramBuilder()
+plant_ = builder_.AddSystem(MultibodyPlant(dt))
 plant_ = create_system_model(plant_)
-input_port_index = plant_.get_actuation_input_port().get_index()
+builder_.ExportInput(plant_.get_actuation_input_port(), "control")
+system_ = builder_.Build()
 
 #-----------------------------------------
 # DDP method
@@ -93,9 +96,8 @@ def solve_ilqr(solver, x0, u_guess):
 if method == "ilqr":
     # Set up optimizer
     num_steps = int(T/dt)
-    ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
-            input_port_index=input_port_index,
-            beta=0.5)
+    ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
+            beta=0.5, autodiff=True)
 
     # Define the problem
     ilqr.SetTargetState(x_nom)
@@ -150,6 +152,7 @@ if method == "ilqr":
 
 elif method == "sqp":
     context_ = plant_.CreateDefaultContext()
+    input_port_index = plant_.get_actuation_input_port().get_index()
 
     # Set up the solver object
     trajopt = DirectTranscription(

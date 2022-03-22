@@ -25,14 +25,14 @@ save_file = "data/" + scenario + ".npz"
 # Parameters
 ####################################
 
-T = 1.0
-dt = 1e-2
+T = 0.5
+dt = 2e-3
 playback_rate = 0.2
 
 # Some useful joint angle definitions
 q_home = np.pi/180*np.array([0, 15, 180, 230, 0, 55, 90])
 q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, np.pi/2])
-q_push = np.array([0.0, np.pi/4+0.13, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
+q_push = np.array([0.0, np.pi/4+0.17, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
 q_wrap = np.pi/180*np.array([55, 125, 114, 244, 217, 45, 8])
 
 # Some useful ball pose definitions
@@ -84,7 +84,7 @@ mu_static = 0.3
 mu_dynamic = 0.2
 
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
-mesh_type = HydroelasticContactRepresentation.kTriangle  # Triangle or Polygon
+mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 
 ####################################
 # Tools for system setup
@@ -232,7 +232,7 @@ if optimize:
     # Set up the optimizer
     num_steps = int(T/dt)
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-            beta=0.5, delta=1e-3, gamma=0)
+            beta=0.5, delta=1e-3, gamma=0, autodiff=False)
 
     # Define the optimization problem
     ilqr.SetInitialState(x0)
@@ -282,11 +282,8 @@ if playback:
             diagram_context.SetTime(t)
             plant.SetPositionsAndVelocities(plant_context, x)
             plant.get_actuation_input_port().FixValue(plant_context,  u)
-            st = time.time()
             diagram.CalcDiscreteVariableUpdates(diagram_context, 
                     diagram_context.get_discrete_state())
-            et = time.time()
-            print("TAMSI step clock time: ", et-st)
             diagram.Publish(diagram_context)
 
             time.sleep(1/playback_rate*dt-4e-4)

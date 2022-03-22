@@ -12,7 +12,8 @@ by Vince Kurtz and Hai Lin, [https://arxiv.org/abs/2202.13986](https://arxiv.org
 Install the dependencies:
 - Python 3
 - Numpy
-- [Drake](https://drake.mit.edu/installation.html)
+- [This fork](https://github.com/vincekurtz/drake/tree/approximate_tamsi_gradient) of Drake, which includes a custom dynamics gradient approximation for
+  the TAMSI timestepping scheme. 
 
 Clone the repository:
 ```
