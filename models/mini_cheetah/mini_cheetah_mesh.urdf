@@ -484,7 +484,6 @@
             <drake:proximity_properties>
                 <drake:rigid_hydroelastic/>
                 <drake:mesh_resolution_hint value="0.02"/>
-                <drake:hydroelastic_modulus value="5e6"/>
                 <drake:hunt_crossley_dissipation value="1.25"/>
             </drake:proximity_properties>
             <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
@@ -510,7 +509,6 @@
             <drake:proximity_properties>
                 <drake:rigid_hydroelastic/>
                 <drake:mesh_resolution_hint value="0.02"/>
-                <drake:hydroelastic_modulus value="5e6"/>
                 <drake:hunt_crossley_dissipation value="1.25"/>
             </drake:proximity_properties>
             <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
@@ -536,7 +534,6 @@
             <drake:proximity_properties>
                 <drake:rigid_hydroelastic/>
                 <drake:mesh_resolution_hint value="0.02"/>
-                <drake:hydroelastic_modulus value="5e6"/>
                 <drake:hunt_crossley_dissipation value="1.25"/>
             </drake:proximity_properties>
             <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
@@ -562,7 +559,6 @@
             <drake:proximity_properties>
                 <drake:rigid_hydroelastic/>
                 <drake:mesh_resolution_hint value="0.02"/>
-                <drake:hydroelastic_modulus value="5e6"/>
                 <drake:hunt_crossley_dissipation value="1.25"/>
             </drake:proximity_properties>
             <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>

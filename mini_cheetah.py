@@ -17,44 +17,65 @@ from ilqr import IterativeLinearQuadraticRegulator
 
 T = 0.2
 dt = 5e-3
-playback_rate = 0.2
-target_vel = 0.50   # m/s
+playback_rate = 1.0
+target_vel = 0.00   # m/s
 
 # MPC parameters
-num_resolves = 20  # total number of times to resolve the optimizaiton problem
+num_resolves = 100    # total number of times to resolve the optimizaiton problem
 replan_steps = 4    # number of timesteps after which to move the horizon and
                     # re-solve the MPC problem (>0)
 
 # Some useful definitions
-q0 = np.asarray([ 1.0, 0.0, 0.0, 0.0,     # base orientation
-                  0.0, 0.0, 0.29,          # base position
-                  0.0,-0.8, 1.6,
-                  0.0,-0.8, 1.6,
-                  0.0,-0.8, 1.6,
-                  0.0,-0.8, 1.6])
+q_stand = np.asarray([   # standing position
+    1.0, 0.0, 0.0, 0.0,     # base orientation
+    0.0, 0.0, 0.29,         # base position
+    0.0,-0.8, 1.6,          # front left (adab, hip, knee)
+    0.0,-0.8, 1.6,          # front right
+    0.0,-0.8, 1.6,          # back left
+    0.0,-0.8, 1.6])         # back right
+q_nom = np.asarray([    # legs reaching forward
+    0.99, 0.0,-0.1, 0.1, 
+    0.0, 0.0, 0.29,     
+    0.0,-0.5, 1.8,
+    0.0,-0.5, 1.8,
+    0.0,-0.5, 1.8,
+    0.0,-0.5, 1.8])
 u_stand = np.array([ 0.16370625,  0.42056475, -3.06492254,  0.16861717,  0.14882384,
        -2.43250739,  0.08305763,  0.26016952, -2.74586461,  0.08721941,
         0.02331732, -2.18319231])
 
 # Initial state
-x0 = np.hstack([q0, np.zeros(18)])
+x0 = np.hstack([q_stand, np.zeros(18)])
 
 # Target state
-x_nom = np.hstack([q0, np.zeros(18)])
+x_nom = np.hstack([q_nom, np.zeros(18)])
 x_nom[4] += target_vel*T  # base x position
 x_nom[22] += target_vel  # base x velocity
 
 # Quadratic cost
-Qq_base = np.ones(7)
-Qq_base[0:4] += 2
-Qv_base = np.ones(6)
+Q_theta = 2*np.ones(4)    # body orientation
+Qf_theta = 10*np.ones(4)
 
-Qq_legs = 0.0*np.ones(12)
-Qv_legs = 0.01*np.ones(12)
+Q_p = 1.0*np.ones(3)        # body position
+Qf_p = 5.0*np.ones(3)
 
-Q = np.diag(np.hstack([Qq_base,Qq_legs,0.01*Qv_base,Qv_legs]))
+Q_q = 0.0*np.ones(12)       # joint angles
+Qf_q = 0.0*np.ones(12)
+
+Q_omega = 0.01*np.ones(3)    # body angular velocity
+Qf_omega = np.ones(3)
+
+Q_pdot = 0.01*np.ones(3)     # body linear velocity
+Qf_pdot = np.ones(3)
+
+Q_qdot = 0.1*np.ones(12)    # joint velocities
+Qf_qdot = 0.1*np.ones(12)
+
+Q = np.diag(np.hstack([
+    Q_theta, Q_p, Q_q, Q_omega, Q_pdot, Q_qdot ]))
+Qf = np.diag(np.hstack([
+    Qf_theta, Qf_p, Qf_q, Qf_omega, Qf_pdot, Qf_qdot ]))
 R = 0.01*np.eye(12)
-Qf = np.diag(np.hstack([5*Qq_base,0.1+Qq_legs,Qv_base,Qv_legs]))
 
 # Contact model parameters
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
@@ -63,8 +84,9 @@ mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 mu = 0.5
 
 dissipation = 0
-hydroelastic_modulus = 5e6
+hydroelastic_modulus = 1e7
 resolution_hint = 0.1
+penetration_allowance = 0.005   # point contact only
 
 ####################################
 # Tools for system setup
@@ -84,10 +106,14 @@ def create_system_model(plant):
     X_ground = RigidTransform()
     X_ground.set_translation([0,0,-0.5])
     ground_shape = Box(25,25,1)
+    plant.set_penetration_allowance(penetration_allowance)
     plant.RegisterCollisionGeometry(plant.world_body(), X_ground,
             ground_shape, "ground_collision", ground_props)
     #plant.RegisterVisualGeometry(plant.world_body(), X_ground,
     #        ground_shape, "ground_visual", np.array([1,0,0,0.5]))
+
+    # Turn off gravity
+    #plant.mutable_gravity_field().set_gravity_vector([0,0,0])
 
     # Choose contact model
     plant.set_contact_surface_representation(mesh_type)
