@@ -15,14 +15,14 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 0.2
+T = 0.5
 dt = 5e-3
 playback_rate = 1.0
-target_vel = 0.00   # m/s
+target_vel = 0.50   # m/s
 
 # MPC parameters
-num_resolves = 100    # total number of times to resolve the optimizaiton problem
-replan_steps = 4    # number of timesteps after which to move the horizon and
+num_resolves = 0   # total number of times to resolve the optimizaiton problem
+replan_steps = 10   # number of timesteps after which to move the horizon and
                     # re-solve the MPC problem (>0)
 
 # Some useful definitions
@@ -34,12 +34,12 @@ q_stand = np.asarray([   # standing position
     0.0,-0.8, 1.6,          # back left
     0.0,-0.8, 1.6])         # back right
 q_nom = np.asarray([    # legs reaching forward
-    0.99, 0.0,-0.1, 0.1, 
+    1.0, 0.0,0.0, 0.0, 
     0.0, 0.0, 0.29,     
-    0.0,-0.5, 1.8,
-    0.0,-0.5, 1.8,
-    0.0,-0.5, 1.8,
-    0.0,-0.5, 1.8])
+    0.0,-0.8, 1.6,
+    0.0,-0.8, 1.6,
+    0.0,-0.8, 1.6,
+    0.0,-0.8, 1.6])
 u_stand = np.array([ 0.16370625,  0.42056475, -3.06492254,  0.16861717,  0.14882384,
        -2.43250739,  0.08305763,  0.26016952, -2.74586461,  0.08721941,
         0.02331732, -2.18319231])
@@ -53,23 +53,23 @@ x_nom[4] += target_vel*T  # base x position
 x_nom[22] += target_vel  # base x velocity
 
 # Quadratic cost
-Q_theta = 2*np.ones(4)    # body orientation
-Qf_theta = 10*np.ones(4)
+Q_theta = 1.0*np.ones(4)    # body orientation
+Qf_theta = 10.0*np.ones(4)
 
-Q_p = 1.0*np.ones(3)        # body position
-Qf_p = 5.0*np.ones(3)
+Q_p = np.array([0,10,0])        # body position
+Qf_p = 10.0*np.ones(3)
 
 Q_q = 0.0*np.ones(12)       # joint angles
-Qf_q = 0.0*np.ones(12)
+Qf_q = 0.1*np.ones(12)
 
-Q_omega = 0.01*np.ones(3)    # body angular velocity
-Qf_omega = np.ones(3)
+Q_omega = 0.0*np.ones(3)    # body angular velocity
+Qf_omega = 1.0*np.ones(3)
 
-Q_pdot = 0.01*np.ones(3)     # body linear velocity
-Qf_pdot = np.ones(3)
+Q_pdot = 0.0*np.ones(3)     # body linear velocity
+Qf_pdot = 0.0*np.ones(3)
 
-Q_qdot = 0.1*np.ones(12)    # joint velocities
-Qf_qdot = 0.1*np.ones(12)
+Q_qdot = 0.0*np.ones(12)    # joint velocities
+Qf_qdot = 0.0*np.ones(12)
 
 Q = np.diag(np.hstack([
     Q_theta, Q_p, Q_q, Q_omega, Q_pdot, Q_qdot ]))
@@ -81,10 +81,10 @@ R = 0.01*np.eye(12)
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
 mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 
-mu = 0.5
+mu = 0.2
 
 dissipation = 0
-hydroelastic_modulus = 1e7
+hydroelastic_modulus = 5e6
 resolution_hint = 0.1
 penetration_allowance = 0.005   # point contact only
 

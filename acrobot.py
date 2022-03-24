@@ -21,7 +21,7 @@ dt = 1e-2      # simulation timestep
 # Solver method
 # must be "ilqr" or "sqp"
 method = "ilqr"
-MPC = True      # MPC only works with ilqr for now
+MPC = False      # MPC only works with ilqr for now
 
 # Initial state
 x0 = np.array([0,0,0,0])
@@ -97,7 +97,7 @@ if method == "ilqr":
     # Set up optimizer
     num_steps = int(T/dt)
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-            beta=0.5, autodiff=True)
+            beta=0.5, autodiff=False)
 
     # Define the problem
     ilqr.SetTargetState(x_nom)

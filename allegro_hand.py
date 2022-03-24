@@ -13,8 +13,9 @@ import time
 
 # Choose what to do
 simulate = False
-optimize = True
-playback = True
+optimize = False
+playback = False
+debug_gradients = True
 
 ####################################
 # Parameters
@@ -44,9 +45,11 @@ Qf = Q
 # Tools for system setup
 ####################################
 
-def create_system_model(plant, scene_graph):
+def create_system_model(builder, dt):
+    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
+
     # Add allegro hand model
-    sdf = FindResourceOrThrow("drake/manipulation/models/allegro_hand_description/sdf/allegro_hand_description_right.sdf")
+    sdf = "models/allegro_hand/allegro_hand.sdf"
     hand = Parser(plant=plant).AddModelFromFile(sdf)
 
     # Fix the hand position in the world
@@ -67,12 +70,11 @@ def create_system_model(plant, scene_graph):
 # Create system diagram
 ####################################
 builder = DiagramBuilder()
-plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
-plant, scene_graph = create_system_model(plant, scene_graph)
+plant, scene_graph = create_system_model(builder, dt)
 
 # Connect to visualizer
 DrakeVisualizer().AddToBuilder(builder, scene_graph)
-ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+#ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
 # Finalize the diagram
 diagram = builder.Build()
@@ -87,8 +89,7 @@ plant_context = diagram.GetMutableSubsystemContext(
 if optimize:
     # Create system model for controller
     builder_ = DiagramBuilder()
-    plant_, scene_graph_ = AddMultibodyPlantSceneGraph(builder_, dt)
-    plant_, scene_graph_ = create_system_model(plant_, scene_graph_)
+    plant_, scene_graph_ = create_system_model(builder_, dt)
     builder_.ExportInput(plant_.get_actuation_input_port(), "control")
     system_ = builder_.Build()
 
@@ -156,3 +157,52 @@ if simulate:
     simulator.set_target_realtime_rate(playback_rate)
 
     simulator.AdvanceTo(T)
+
+###################################
+# Do some gradient debugging
+###################################
+
+if debug_gradients:
+    import matplotlib.pyplot as plt
+
+    u0 = np.zeros(plant.num_actuators())
+
+    # Get gradients via custom method
+    plant.get_actuation_input_port().FixValue(plant_context, u0)
+    plant.SetPositionsAndVelocities(plant_context, x0)
+    x_next, fx, fu = plant.DiscreteDynamicsWithApproximateGradients(plant_context)
+
+    # Get gradients via autodiff
+    diagram_ad = diagram.ToAutoDiffXd()
+    context_ad = diagram_ad.CreateDefaultContext()
+    plant_ad = diagram_ad.GetSubsystemByName("plant")
+    plant_context_ad = diagram_ad.GetMutableSubsystemContext(plant_ad, context_ad)
+    xu_ad = InitializeAutoDiff(np.hstack([x0,u0]))
+    x_ad = xu_ad[:plant.num_multibody_states()]
+    u_ad = xu_ad[plant.num_multibody_states():]
+    
+    plant_ad.get_actuation_input_port().FixValue(plant_context_ad, u_ad)
+    plant_ad.SetPositionsAndVelocities(plant_context_ad, x_ad)
+    state = context_ad.get_discrete_state()
+    diagram_ad.CalcDiscreteVariableUpdates(context_ad, state)
+    x_next_ad = state.get_vector().CopyToVector()
+    G = ExtractGradient(x_next_ad)
+    fx_ad = G[:,:plant.num_multibody_states()]
+    fu_ad = G[:,plant.num_multibody_states():]
+
+    # Visualize the gradients
+    plt.subplot(2,2,1)
+    plt.imshow(fx)
+    plt.title("fx ours")
+    plt.subplot(2,2,2)
+    plt.imshow(fx_ad)
+    plt.title("fx autodiff")
+    plt.subplot(2,2,3)
+    plt.imshow(fu)
+    plt.title("fu ours")
+    plt.subplot(2,2,4)
+    plt.imshow(fu_ad)
+    plt.title("fu autodiff")
+
+    plt.show()
+
