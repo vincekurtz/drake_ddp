@@ -45,18 +45,17 @@ class IterativeLinearQuadraticRegulator():
         self.context = self.system.CreateDefaultContext()
         self.input_port = self.system.get_input_port(input_port_index)
 
-        if autodiff:
-            # Make an autodiff copy of the system for computing dynamics gradients
-            self.system_ad = system.ToAutoDiffXd()
-            self.context_ad = self.system_ad.CreateDefaultContext()
-            self.input_port_ad = self.system_ad.get_input_port(input_port_index)
-        else:
-            # Extract the MultibodyPlant model from the given system. 
-            # The system in this case must include a MultibodyPlant called "plant"
-            # which is attached to a corresponding scene graph (for geometry computations)
-            self.plant = self.system.GetSubsystemByName("plant")
-            self.plant_context = self.system.GetMutableSubsystemContext(self.plant, self.context)
-
+        # Make an autodiff copy of the system for computing dynamics gradients
+        self.system_ad = system.ToAutoDiffXd()
+        self.context_ad = self.system_ad.CreateDefaultContext()
+        self.input_port_ad = self.system_ad.get_input_port(input_port_index)
+        
+        # Extract the MultibodyPlant model from the given system. 
+        # The system in this case must include a MultibodyPlant called "plant"
+        # which is attached to a corresponding scene graph (for geometry computations)
+        self.plant = self.system.GetSubsystemByName("plant")
+        self.plant_context = self.system.GetMutableSubsystemContext(self.plant, self.context)
+           
         # Set some parameters
         self.N = num_timesteps
         self.delta = delta
@@ -224,6 +223,7 @@ class IterativeLinearQuadraticRegulator():
 
         return x_next
 
+
     def _calc_dynamics_partials(self, x, u):
         """
         Compute dynamics partials 
@@ -231,35 +231,46 @@ class IterativeLinearQuadraticRegulator():
             x_next = f(x,u)
             fx = partial f(x,u) / partial x
             fu = partial f(x,u) / partial u
-       
-        using automatic differentiation.
         """
         if self.autodiff:
-            # Create autodiff versions of x and u
-            xu = np.hstack([x,u])
-            xu_ad = InitializeAutoDiff(xu)
-            x_ad = xu_ad[:self.n]
-            u_ad = xu_ad[self.n:]
-
-            # Set input and state variables in our stored model accordingly
-            self.context_ad.SetDiscreteState(x_ad)
-            self.input_port_ad.FixValue(self.context_ad, u_ad)
-
-            # Compute the forward dynamics x_next = f(x,u)
-            state = self.context_ad.get_discrete_state()
-            self.system_ad.CalcDiscreteVariableUpdates(self.context_ad, state)
-            x_next = state.get_vector().CopyToVector()
-           
-            # Compute partial derivatives
-            G = ExtractGradient(x_next)
-            fx = G[:,:self.n]
-            fu = G[:,self.n:]
-
+            return self._calc_dynamics_partials_ad(x,u)
         else:
-            # Use our custom dynamics gradient approximation, which exploits
-            # the structure of the TAMSI time-stepper.
-            x_next, fx, fu = \
-                    self.plant.DiscreteDynamicsWithApproximateGradients(self.plant_context)
+            return self._calc_dynamics_partials_custom(x,u)
+    
+    def _calc_dynamics_partials_ad(self, x, u):
+        """
+        Compute dynamics partials using automatic differentiation.
+        """
+        # Create autodiff versions of x and u
+        xu = np.hstack([x,u])
+        xu_ad = InitializeAutoDiff(xu)
+        x_ad = xu_ad[:self.n]
+        u_ad = xu_ad[self.n:]
+
+        # Set input and state variables in our stored model accordingly
+        self.context_ad.SetDiscreteState(x_ad)
+        self.input_port_ad.FixValue(self.context_ad, u_ad)
+
+        # Compute the forward dynamics x_next = f(x,u)
+        state = self.context_ad.get_discrete_state()
+        self.system_ad.CalcDiscreteVariableUpdates(self.context_ad, state)
+        x_next = state.get_vector().CopyToVector()
+       
+        # Compute partial derivatives
+        G = ExtractGradient(x_next)
+        fx = G[:,:self.n]
+        fu = G[:,self.n:]
+        
+        return (fx, fu)
+
+    def _calc_dynamics_partials_custom(self, x, u):
+        """
+        Compute dynamics partials using some (faster) custom methods.
+        """
+        self.context.SetDiscreteState(x)
+        self.input_port.FixValue(self.context, u)
+        x_next, fx, fu = \
+                self.plant.DiscreteDynamicsWithApproximateGradients(self.plant_context)
 
         return (fx, fu)
 

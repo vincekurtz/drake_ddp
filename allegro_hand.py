@@ -13,15 +13,15 @@ import time
 
 # Choose what to do
 simulate = False
-optimize = False
-playback = False
-debug_gradients = True
+optimize = True 
+playback = True
+debug_gradients = False
 
 ####################################
 # Parameters
 ####################################
 
-T = 0.5               # total simulation time (S)
+T = 0.1               # total simulation time (S)
 dt = 1e-3             # simulation timestep
 playback_rate = 1.0   # simulation rate
 
@@ -34,8 +34,8 @@ x0 = np.hstack([q0,v0])
 x_nom = 0.5 + np.zeros(32)
 
 # Quadratic cost int_{0^T} (x'Qx + u'Ru) + x_T*Qf*x_T
-Qq_hand = 0.01*np.ones(16)
-Qv_hand = 0.0*np.ones(16)
+Qq_hand = 0.1*np.ones(16)
+Qv_hand = 0.01*np.ones(16)
 
 Q = np.diag(np.hstack([Qq_hand, Qv_hand]))
 R = np.eye(16)
@@ -61,6 +61,9 @@ def create_system_model(builder, dt):
                      X_hand)
 
     # Add something to manipulate
+   
+    # Turn off gravity
+    #plant.mutable_gravity_field().set_gravity_vector([0,0,0])
 
     plant.Finalize()
     plant.set_name("plant")
@@ -96,7 +99,7 @@ if optimize:
     # Set up the optimizer
     num_steps = int(T/dt)
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-            beta=0.9, autodiff=False)
+            beta=0.9, autodiff=True)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)
@@ -170,7 +173,9 @@ if debug_gradients:
     # Get gradients via custom method
     plant.get_actuation_input_port().FixValue(plant_context, u0)
     plant.SetPositionsAndVelocities(plant_context, x0)
+    st = time.time()
     x_next, fx, fu = plant.DiscreteDynamicsWithApproximateGradients(plant_context)
+    print("our time: ", time.time()-st)
 
     # Get gradients via autodiff
     diagram_ad = diagram.ToAutoDiffXd()
@@ -184,18 +189,27 @@ if debug_gradients:
     plant_ad.get_actuation_input_port().FixValue(plant_context_ad, u_ad)
     plant_ad.SetPositionsAndVelocities(plant_context_ad, x_ad)
     state = context_ad.get_discrete_state()
+    st = time.time()
     diagram_ad.CalcDiscreteVariableUpdates(context_ad, state)
+    print("autodiff time: ", time.time()-st)
     x_next_ad = state.get_vector().CopyToVector()
     G = ExtractGradient(x_next_ad)
     fx_ad = G[:,:plant.num_multibody_states()]
     fu_ad = G[:,plant.num_multibody_states():]
 
+    # zoom in on a particular part
+    #fx = fx[16:,:16]
+    #fx_ad = fx_ad[16:,:16]
+
     # Visualize the gradients
+    min_ = np.amin(np.hstack([fx,fx_ad]))
+    max_ = np.amax(np.hstack([fx,fx_ad]))
+
     plt.subplot(2,2,1)
-    plt.imshow(fx)
+    plt.imshow(fx, vmin=min_, vmax=max_)
     plt.title("fx ours")
     plt.subplot(2,2,2)
-    plt.imshow(fx_ad)
+    plt.imshow(fx_ad, vmin=min_, vmax=max_)
     plt.title("fx autodiff")
     plt.subplot(2,2,3)
     plt.imshow(fu)
@@ -203,6 +217,23 @@ if debug_gradients:
     plt.subplot(2,2,4)
     plt.imshow(fu_ad)
     plt.title("fu autodiff")
+
+    # Do some computations related to the error
+    err = fx-fx_ad
+    dq_dq_err = np.amax(np.abs(err[:16,:16]))
+    dv_dq_err = np.amax(np.abs(err[16:,:16]))
+    dv_dv_err = np.amax(np.abs(err[16:,16:]))
+    dq_dv_err = np.amax(np.abs(err[:16,16:]))
+
+    print("\nMax errors:")
+    print(f"    dq_dq {dq_dq_err}")
+    print(f"    dq_dv {dq_dv_err}")
+    print(f"    dv_dq {dv_dq_err}")
+    print(f"    dv_dv {dv_dv_err}")
+
+    plt.figure()
+    plt.imshow(err)
+    plt.title("fx error")
 
     plt.show()
 

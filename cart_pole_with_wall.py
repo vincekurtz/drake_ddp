@@ -20,19 +20,19 @@ dt = 1e-2
 playback_rate = 1.0
 
 # Initial state
-x0 = np.array([0.0,np.pi+0.5,0,0])
+x0 = np.array([0.0,np.pi+0.5,-0.5,0])
 
 # Target state
 x_nom = np.array([0,np.pi,0,0])
 
 # Quadratic cost
-Q = np.diag([0.1,1,0.01,0.01])
+Q = np.diag([0.1,0.1,0.1,0.1])
 R = 0.001*np.eye(1)
 Qf = np.diag([200,200,10,10])
 
 # Contact model parameters
-dissipation = 1.0              # controls "bounciness" of collisions: lower is bouncier
-hydroelastic_modulus = 2e5     # controls "squishiness" of collisions: lower is squishier
+dissipation = 0.0              # controls "bounciness" of collisions: lower is bouncier
+hydroelastic_modulus = 2e6     # controls "squishiness" of collisions: lower is squishier
 resolution_hint = 0.05         # smaller means a finer mesh
 penetration_allowance = 0.1    # controls "softenss" of collisions for point contact model
 mu = 0.5                       # friction coefficient
@@ -84,6 +84,9 @@ def create_system_model(plant):
         AddContactMaterial(dissipation=dissipation, friction=CoulombFriction(), properties=wall_props)
     plant.RegisterCollisionGeometry(wall, RigidTransform(), 
             Box(l,w,h), "wall_collision", wall_props)
+
+    # Turn off gravity
+    #plant.mutable_gravity_field().set_gravity_vector([0,0,0])
     
     # Choose contact model
     plant.set_contact_surface_representation(mesh_type)
@@ -161,7 +164,7 @@ print(fu_ad)
 
 # Set up the optimizer
 num_steps = int(T/dt)
-ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, autodiff=False)
+ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, autodiff=True)
 
 # Define the optimization problem
 ilqr.SetInitialState(x0)
