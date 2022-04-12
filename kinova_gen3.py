@@ -13,10 +13,11 @@ from ilqr import IterativeLinearQuadraticRegulator
 
 # Choose what to do
 simulate = False   # Run a simple simulation with fixed input
-optimize = True    # Find an optimal trajectory using ilqr
-playback = True    # Visualize the optimal trajectory by playing it back.
+optimize = False   # Find an optimal trajectory using ilqr
+playback = False   # Visualize the optimal trajectory by playing it back.
                    # If optimize=False, attempts to load a previously saved
                    # trajectory from a file.
+debug_gradients = True
 
 scenario = "side"   # "lift", "forward", or "side"
 save_file = "data/" + scenario + ".npz"
@@ -210,7 +211,7 @@ plant, scene_graph = create_system_model(plant, scene_graph)
 # Connect to visualizer
 params = DrakeVisualizerParams(role=Role.kProximity, show_hydroelastic=True)
 DrakeVisualizer(params=params).AddToBuilder(builder, scene_graph)
-ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+#ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
 # Finailze the diagram
 diagram = builder.Build()
@@ -319,3 +320,83 @@ if simulate:
     integrator.set_requested_minimum_step_size(1e-3)
 
     simulator.AdvanceTo(T)
+
+###################################
+# Do some gradient debugging
+###################################
+
+if debug_gradients:
+    import matplotlib.pyplot as plt
+
+    u0 = np.zeros(plant.num_actuators())
+    nx = plant.num_multibody_states()
+    nq = plant.num_positions()
+    nv = plant.num_velocities()
+
+    # Get gradients via custom method
+    plant.get_actuation_input_port().FixValue(plant_context, u0)
+    plant.SetPositionsAndVelocities(plant_context, x0)
+    st = time.time()
+    x_next, fx, fu = plant.DiscreteDynamicsWithApproximateGradients(plant_context)
+    print("our time: ", time.time()-st)
+
+    # Get gradients via autodiff
+    diagram_ad = diagram.ToAutoDiffXd()
+    context_ad = diagram_ad.CreateDefaultContext()
+    plant_ad = diagram_ad.GetSubsystemByName("plant")
+    plant_context_ad = diagram_ad.GetMutableSubsystemContext(plant_ad, context_ad)
+    xu_ad = InitializeAutoDiff(np.hstack([x0,u0]))
+    x_ad = xu_ad[:plant.num_multibody_states()]
+    u_ad = xu_ad[plant.num_multibody_states():]
+    
+    plant_ad.get_actuation_input_port().FixValue(plant_context_ad, u_ad)
+    plant_ad.SetPositionsAndVelocities(plant_context_ad, x_ad)
+    state = context_ad.get_discrete_state()
+    st = time.time()
+    diagram_ad.CalcDiscreteVariableUpdates(context_ad, state)
+    print("autodiff time: ", time.time()-st)
+    x_next_ad = state.get_vector().CopyToVector()
+    G = ExtractGradient(x_next_ad)
+    fx_ad = G[:,:nx]
+    fu_ad = G[:,nx:]
+
+    # zoom in on a particular part
+    #fx = fx[nq:,nq:]
+    #fx_ad = fx_ad[nq:,nq:]
+
+    # Visualize the gradients
+    min_ = np.amin(np.hstack([fx,fx_ad]))
+    max_ = np.amax(np.hstack([fx,fx_ad]))
+
+    plt.subplot(2,2,1)
+    plt.imshow(fx, vmin=min_, vmax=max_)
+    plt.title("fx ours")
+    plt.subplot(2,2,2)
+    plt.imshow(fx_ad, vmin=min_, vmax=max_)
+    plt.title("fx autodiff")
+    plt.subplot(2,2,3)
+    plt.imshow(fu)
+    plt.title("fu ours")
+    plt.subplot(2,2,4)
+    plt.imshow(fu_ad)
+    plt.title("fu autodiff")
+
+    # Do some computations related to the error
+    err = fx - fx_ad
+    dq_dq_err = np.amax(np.abs(err[:nq,:nq]))
+    dv_dq_err = np.amax(np.abs(err[nq:,:nq]))
+    dv_dv_err = np.amax(np.abs(err[nq:,nq:]))
+    dq_dv_err = np.amax(np.abs(err[:nq,nq:]))
+
+    print("\nMax errors:")
+    print(f"    dq_dq {dq_dq_err}")
+    print(f"    dq_dv {dq_dv_err}")
+    print(f"    dv_dq {dv_dq_err}")
+    print(f"    dv_dv {dv_dv_err}")
+
+    plt.figure()
+    plt.imshow(err)
+    plt.title("fx error")
+
+    plt.show()
+

@@ -267,10 +267,18 @@ class IterativeLinearQuadraticRegulator():
         """
         Compute dynamics partials using some (faster) custom methods.
         """
-        self.context.SetDiscreteState(x)
-        self.input_port.FixValue(self.context, u)
-        x_next, fx, fu = \
-                self.plant.DiscreteDynamicsWithApproximateGradients(self.plant_context)
+        fx, fu =  self._calc_dynamics_partials_ad(x,u)
+
+        # We can compute fu directly
+        self.plant.SetPositionsAndVelocities(self.plant_context, x)
+        M = self.plant.CalcMassMatrix(self.plant_context)
+        B = self.plant.MakeActuationMatrix()
+        N = CalcN(self.plant, self.plant_context)
+        dt = self.plant.time_step()
+        dv_du = dt*np.linalg.inv(M)@B
+        dq_du = dt*N@dv_du
+
+        fu = np.vstack([dq_du, dv_du])
 
         return (fx, fu)
 
@@ -480,3 +488,23 @@ class IterativeLinearQuadraticRegulator():
         K = self.K
 
         np.savez(fname, t=t, x_bar=x_bar, u_bar=u_bar, K=K)
+
+def CalcN(plant, context):
+    """
+    Helper to construct the map from generalized velocities to generalized
+    positions dot,
+
+        qdot = N(q) * v
+
+    where q is stored in the given context. 
+    """
+    nq = plant.num_positions()
+    nv = plant.num_velocities()
+    N = np.zeros((nq,nv))
+    for i in range(nv):
+        v = np.zeros(nv)
+        v[i] = 1.0
+        N[:,i] = plant.MapVelocityToQDot(context, v)
+
+    return N
+

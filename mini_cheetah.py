@@ -15,13 +15,13 @@ from ilqr import IterativeLinearQuadraticRegulator
 # Parameters
 ####################################
 
-T = 0.2
-dt = 5e-3
+T = 0.5
+dt = 1e-2
 playback_rate = 1.0
-target_vel = 0.50   # m/s
+target_vel = 1.50   # m/s
 
 # MPC parameters
-num_resolves = 100   # total number of times to resolve the optimizaiton problem
+num_resolves = 0   # total number of times to resolve the optimizaiton problem
 replan_steps = 4   # number of timesteps after which to move the horizon and
                     # re-solve the MPC problem (>0)
 
@@ -50,26 +50,26 @@ x0 = np.hstack([q_stand, np.zeros(18)])
 # Target state
 x_nom = np.hstack([q_nom, np.zeros(18)])
 x_nom[4] += target_vel*T  # base x position
-x_nom[22] += target_vel  # base x velocity
+#x_nom[22] += target_vel  # base x velocity
 
 # Quadratic cost
-Q_theta = 2.0*np.ones(4)    # body orientation
+Q_theta = 10.0*np.ones(4)    # body orientation
 Qf_theta = 10.0*np.ones(4)
 
-Q_p = 1.0*np.array([0,1,0])        # body position
-Qf_p = 5.0*np.ones(3)
+Q_p = 0.01*np.array([0,1,0])        # body position
+Qf_p = 10.0*np.ones(3)
 
 Q_q = 0.0*np.ones(12)       # joint angles
-Qf_q = 0.1*np.ones(12)
+Qf_q = 1.0*np.ones(12)
 
-Q_omega = 0.01*np.ones(3)    # body angular velocity
+Q_omega = 0.0*np.ones(3)    # body angular velocity
 Qf_omega = 1.0*np.ones(3)
 
-Q_pdot = 0.01*np.ones(3)     # body linear velocity
+Q_pdot = 0.0*np.ones(3)     # body linear velocity
 Qf_pdot = 1.0*np.ones(3)
 
 Q_qdot = 0.01*np.ones(12)    # joint velocities
-Qf_qdot = 0.01*np.ones(12)
+Qf_qdot = 1.0*np.ones(12)
 
 Q = np.diag(np.hstack([
     Q_theta, Q_p, Q_q, Q_omega, Q_pdot, Q_qdot ]))
@@ -168,7 +168,7 @@ def solve_ilqr(solver, x0, u_guess, move_target=False):
 # Set up the optimizer
 num_steps = int(T/dt)
 ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-        beta=0.5, delta=1e-2, gamma=0, autodiff=True)
+        beta=0.5, delta=1e-2, gamma=0, autodiff=False)
 
 # Define the optimization problem
 ilqr.SetTargetState(x_nom)
