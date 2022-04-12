@@ -263,9 +263,9 @@ class IterativeLinearQuadraticRegulator():
         
         return (fx, fu)
 
-    def _calc_dynamics_partials_custom(self, x, u):
+    def _calc_dynamics_partials_finite_diff(self, x, u):
         """
-        Compute dynamics partials using some (faster) custom methods.
+        Compute dynamics partials using finite differences.
         """
         # We can compute fu directly
         self.plant.SetPositionsAndVelocities(self.plant_context, x)
@@ -299,6 +299,38 @@ class IterativeLinearQuadraticRegulator():
 
             # approximate fx = [f(x+delta,u) - f(x,u)]/eps
             fx[:,i] = (f_delta- f)/eps
+
+        return (fx, fu)
+
+    def _calc_dynamics_partials_custom(self, x, u):
+        """
+        Compute dynamics partials using some (faster) custom methods.
+        """
+        # We can compute fu directly
+        self.plant.SetPositionsAndVelocities(self.plant_context, x)
+        M = self.plant.CalcMassMatrix(self.plant_context)
+        B = self.plant.MakeActuationMatrix()
+        N = CalcN(self.plant, self.plant_context)
+        dt = self.plant.time_step()
+        dv_du = dt*np.linalg.inv(M)@B
+        dq_du = dt*N@dv_du
+        fu = np.vstack([dq_du, dv_du])
+
+        # Allocate fx
+        fx = np.zeros((self.n, self.n))
+
+        # Compute f(x,u) as baseline
+        self.context.SetDiscreteState(x)
+        self.input_port.FixValue(self.context, u)
+        state = self.context.get_discrete_state()
+        self.system.CalcDiscreteVariableUpdates(self.context, state)
+        f = state.get_vector().CopyToVector()
+
+        # Stochastic approximation of fx
+        fx_gt, _ = self._calc_dynamics_partials_ad(x,u)
+        noise = np.random.normal(0, 0.01, size=(self.n, self.n))
+
+        fx = fx_gt + noise
 
         return (fx, fu)
 

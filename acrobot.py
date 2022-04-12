@@ -104,7 +104,7 @@ if optimize:
         # Set up optimizer
         num_steps = int(T/dt)
         ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-                beta=0.5, autodiff=True)
+                beta=0.5, autodiff=False)
 
         # Define the problem
         ilqr.SetTargetState(x_nom)
