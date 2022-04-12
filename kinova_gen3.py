@@ -13,11 +13,11 @@ from ilqr import IterativeLinearQuadraticRegulator
 
 # Choose what to do
 simulate = False   # Run a simple simulation with fixed input
-optimize = False   # Find an optimal trajectory using ilqr
-playback = False   # Visualize the optimal trajectory by playing it back.
+optimize = True   # Find an optimal trajectory using ilqr
+playback = True   # Visualize the optimal trajectory by playing it back.
                    # If optimize=False, attempts to load a previously saved
                    # trajectory from a file.
-debug_gradients = True
+debug_gradients = False
 
 scenario = "side"   # "lift", "forward", or "side"
 save_file = "data/" + scenario + ".npz"

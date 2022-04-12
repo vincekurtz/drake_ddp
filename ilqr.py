@@ -267,8 +267,6 @@ class IterativeLinearQuadraticRegulator():
         """
         Compute dynamics partials using some (faster) custom methods.
         """
-        fx, fu =  self._calc_dynamics_partials_ad(x,u)
-
         # We can compute fu directly
         self.plant.SetPositionsAndVelocities(self.plant_context, x)
         M = self.plant.CalcMassMatrix(self.plant_context)
@@ -277,8 +275,30 @@ class IterativeLinearQuadraticRegulator():
         dt = self.plant.time_step()
         dv_du = dt*np.linalg.inv(M)@B
         dq_du = dt*N@dv_du
-
         fu = np.vstack([dq_du, dv_du])
+
+        # We can compute fx with finite differences
+        fx = np.zeros((self.n, self.n))
+
+        # Compute f(x,u) as baseline
+        self.context.SetDiscreteState(x)
+        self.input_port.FixValue(self.context, u)
+        state = self.context.get_discrete_state()
+        self.system.CalcDiscreteVariableUpdates(self.context, state)
+        f = state.get_vector().CopyToVector()
+
+        for i in range(self.n):
+            eps = 1e-8
+            delta = np.zeros(self.n)
+            delta[i] = eps
+
+            # compute f(x+delta, u)
+            self.context.SetDiscreteState(x+delta)
+            self.system.CalcDiscreteVariableUpdates(self.context, state)
+            f_delta = state.get_vector().CopyToVector()
+
+            # approximate fx = [f(x+delta,u) - f(x,u)]/eps
+            fx[:,i] = (f_delta- f)/eps
 
         return (fx, fu)
 
