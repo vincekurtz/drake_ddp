@@ -20,17 +20,17 @@ optimize = False
 ####################################
 
 # Simulation parameters
-T = 1.0
+T = 5.0
 dt = 1e-3
 playback_rate = 1.0
 
 # Contact model parameters
 dissipation = 0.0              # controls "bounciness" of collisions: lower is bouncier
-hydroelastic_modulus = 2e5     # controls "squishiness" of collisions: lower is squishier
-resolution_hint = 0.05         # smaller means a finer mesh
+hydroelastic_modulus = 1e6     # controls "squishiness" of collisions: lower is squishier
+resolution_hint = 0.01         # smaller means a finer mesh
 penetration_allowance = 0.02   # controls "softness" of collisions for point contact model
 mu = 0.5                       # friction coefficient
-contact_model = ContactModel.kPoint  # Hydroelastic, Point, or HydroelasticWithFallback
+contact_model = ContactModel.kHydroelasticWithFallback  # Hydroelastic, Point, or HydroelasticWithFallback
 mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 
 # Block parameters
@@ -64,6 +64,7 @@ Qf = np.diag([500,500,1,1])
 
 def create_system_model(builder):
     plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
+    plant.set_penetration_allowance(penetration_allowance)
 
     # Add a block with friction
     block = plant.AddModelInstance("block")
@@ -71,14 +72,23 @@ def create_system_model(builder):
                        G_SP_E=UnitInertia.SolidBox(length, width, height))
     block_body = plant.AddRigidBody("block_body", block, I)
 
+    block_props = ProximityProperties()
+    AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus, block_props)
+    AddContactMaterial(dissipation=dissipation,
+            friction=CoulombFriction(mu,mu), properties=block_props)
     plant.RegisterCollisionGeometry(block_body, RigidTransform(),
-            Box(length, width, height), "box_collision", CoulombFriction(mu,mu))
+            Box(length, width, height), "box_collision", block_props)
+
     plant.RegisterVisualGeometry(block_body, RigidTransform(),
             Box(length, width, height), "box_visual", [0.5, 0.5, 0.9, 1.0])
 
     # Add ground with friction
+    ground_props = ProximityProperties()
+    AddRigidHydroelasticProperties(resolution_hint, ground_props)
+    AddContactMaterial(dissipation=dissipation,
+            friction=CoulombFriction(mu,mu), properties=ground_props)
     plant.RegisterCollisionGeometry(plant.world_body(), RigidTransform(),
-            HalfSpace(), "ground_collision", CoulombFriction(mu,mu))
+            HalfSpace(), "ground_collision", ground_props)
 
     # Add a pusher
     pusher = plant.AddModelInstance("pusher")
@@ -89,8 +99,13 @@ def create_system_model(builder):
     pusher_body = plant.AddRigidBody("pusher_body", pusher,
             SpatialInertia(pusher_mass, [0,0,0], UnitInertia.SolidSphere(pusher_radius)))
 
+    pusher_props = ProximityProperties()
+    AddCompliantHydroelasticProperties(resolution_hint, hydroelastic_modulus, pusher_props)
+    AddContactMaterial(dissipation=dissipation,
+            friction=CoulombFriction(mu,mu), properties=pusher_props)
     plant.RegisterCollisionGeometry(pusher_body, RigidTransform(),
-            Sphere(pusher_radius), "pusher_collision", CoulombFriction(mu,mu))
+            Sphere(pusher_radius), "pusher_collision",pusher_props)
+
     plant.RegisterVisualGeometry(pusher_body,
             RigidTransform(), Sphere(pusher_radius), "pusher_visual", [0.9, 0.5, 0.5, 1.0])
 
