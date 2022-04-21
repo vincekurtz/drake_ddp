@@ -16,7 +16,7 @@ from ilqr import IterativeLinearQuadraticRegulator
 ####################################
 
 T = 1.0
-dt = 1e-2
+dt = 5e-3
 playback_rate = 1.0
 
 # Initial state
@@ -34,11 +34,11 @@ Qf = np.diag([500,500,1,1])
 dissipation = 0.0              # controls "bounciness" of collisions: lower is bouncier
 hydroelastic_modulus = 2e5     # controls "squishiness" of collisions: lower is squishier
 resolution_hint = 0.05         # smaller means a finer mesh
-penetration_allowance = 0.1    # controls "softenss" of collisions for point contact model
+penetration_allowance = 0.02   # controls "softness" of collisions for point contact model
 mu = 0.5                       # friction coefficient
 
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
-mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
+mesh_type = HydroelasticContactRepresentation.kTriangle  # Triangle or Polygon
 
 ####################################
 # Tools for system setup
@@ -126,7 +126,7 @@ system_ = builder_.Build()
 
 # Set up the optimizer
 num_steps = int(T/dt)
-ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, autodiff=False)
+ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, autodiff=True)
 
 # Define the optimization problem
 ilqr.SetInitialState(x0)

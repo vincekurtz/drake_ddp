@@ -11,13 +11,13 @@
         </inertial>
         <visual>
             <geometry>
-                <box size="0.4 0.19 0.1"/>
+                <box size="0.4 0.25 0.08"/>
             </geometry>
             <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
         </visual>
         <collision>
             <geometry>
-                <box size="0.23 0.19 0.1"/>
+                <box size="0.4 0.25 0.08"/>
             </geometry>
             <drake:proximity_properties>
                 <drake:compliant_hydroelastic/>
@@ -32,11 +32,23 @@
     <!--!!!!!!!!!!!!!!!! LEFT FRONT FOOT !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!-->
     <joint name="fl_x" type="prismatic">
         <parent link="body"/>
-        <child link="LF_FOOT"/>
+        <child link="lf_dummy_1"/>
         <origin rpy="0.0 0.0 0.0" xyz="0.2 0.1 -0.2"/>
-            <!--<limit effort="20" lower="-0.1" upper="0.1" velocity="40"/>-->
+        <limit effort="20" lower="-0.1" upper="0.1" velocity="40"/>
     </joint>
+    <joint name="fl_y" type="prismatic">
+        <parent link="lf_dummy_1"/>
+        <child link="LF_FOOT"/>
+        <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+        <limit effort="20" lower="-0.1" upper="0.1" velocity="40"/>
+    </joint>
+    <link name="lf_dummy_1"/>
     <link name="LF_FOOT">
+        <inertial>
+            <mass value="0.01"/>
+            <origin xyz="0.0 0.0 0.0"/>
+            <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+        </inertial>
         <collision>
             <geometry>
                 <sphere radius = "0.0175"/>
@@ -62,6 +74,11 @@
         <type>transmission_interface/SimpleTransmission</type>
         <joint name="fl_x" />
         <actuator name="fl_x_actuator"/>
+    </transmission>
+    <transmission name="fl_y_transmission">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="fl_y" />
+        <actuator name="fl_y_actuator"/>
     </transmission>
     
 </robot>

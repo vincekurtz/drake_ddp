@@ -140,10 +140,14 @@ if playback:
 
 if simulate:
     # Fix input
-    u0 = np.zeros(plant.num_actuators()) - 1
+    u0 = np.zeros(plant.num_actuators())
+    u0[0] += 0.0
+    u0[1] += 0.0
     plant.get_actuation_input_port().FixValue(plant_context, u0)
 
     # Set initial state
+    #q0 = np.array([1,0,0,0, 0,0,0, 0])
+    #x0 = np.hstack([q0,np.zeros(7)])
     #plant.SetPositionsAndVelocities(plant_context, x0)
 
     # Simulate the system

@@ -19,7 +19,7 @@ playback = True   # Visualize the optimal trajectory by playing it back.
                    # trajectory from a file.
 debug_gradients = False
 
-scenario = "side"   # "lift", "forward", or "side"
+scenario = "forward"   # "lift", "forward", or "side"
 save_file = "data/" + scenario + ".npz"
 
 ####################################
@@ -27,8 +27,8 @@ save_file = "data/" + scenario + ".npz"
 ####################################
 
 T = 0.5
-dt = 2e-3
-playback_rate = 0.2
+dt = 5e-3
+playback_rate = 1.0
 
 # Some useful joint angle definitions
 q_home = np.pi/180*np.array([0, 15, 180, 230, 0, 55, 90])
@@ -211,7 +211,7 @@ plant, scene_graph = create_system_model(plant, scene_graph)
 # Connect to visualizer
 params = DrakeVisualizerParams(role=Role.kProximity, show_hydroelastic=True)
 DrakeVisualizer(params=params).AddToBuilder(builder, scene_graph)
-#ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
 # Finailze the diagram
 diagram = builder.Build()
@@ -233,7 +233,7 @@ if optimize:
     # Set up the optimizer
     num_steps = int(T/dt)
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-            beta=0.5, delta=1e-3, gamma=0, autodiff=False)
+            beta=0.5, delta=1e-3, gamma=0, autodiff=True)
 
     # Define the optimization problem
     ilqr.SetInitialState(x0)

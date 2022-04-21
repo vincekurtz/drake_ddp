@@ -86,7 +86,7 @@ if method == "ilqr":
     # Set up the optimizer
     num_steps = int(T/dt)
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-            autodiff=False)
+            autodiff=True)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)
