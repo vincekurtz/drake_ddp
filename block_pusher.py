@@ -53,11 +53,13 @@ x0 = np.hstack([q0,v0])
 
 # Target state
 x_nom = copy(x0)
-x_nom[7] -= 0.1
+x_nom[7] -= 0.15
+x_nom[6] -= 0.05
+x_nom[2:6] = [0.9,0,0,-0.5]
 
 # Quadratic cost
 Qq_push = np.array([0,0])
-Qq_block = np.array([1,1,1,1, 100,100,1])
+Qq_block = np.array([10,10,10,10, 100,100,1])
 Qv_push = np.array([0.1,0.1])
 Qv_block = np.array([1,1,1, 1,1,1])
 Q = np.diag(np.hstack([
@@ -66,8 +68,8 @@ Q = np.diag(np.hstack([
         Qv_push,
         Qv_block]))
 
-R = 0.01*np.eye(2)
-Qf = Q
+R = 0.1*np.eye(2)
+Qf = 10*Q
 
 ####################################
 # Tools for system setup
@@ -135,7 +137,9 @@ def create_system_model(builder):
     # Add a visualization of the target block position
     q_block_nom = x_nom[2:9]
     source = scene_graph.RegisterSource("block_nom")
-    X_nom = RigidTransform(Quaternion(q_block_nom[:4]), q_block_nom[4:])
+    quat = q_block_nom[:4]
+    quat = quat / np.linalg.norm(quat)
+    X_nom = RigidTransform(Quaternion(quat), q_block_nom[4:])
     geometry = GeometryInstance(X_nom, Box(length,width,height), "block_nom_geom")
     geometry.set_illustration_properties(
             MakePhongIllustrationProperties([0,1,0,0.5]))
