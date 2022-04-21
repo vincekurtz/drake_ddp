@@ -10,18 +10,19 @@
 import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
+from copy import copy
 
 # Choose what to do
-simulate = True
-optimize = False
+simulate = False
+optimize = True
 
 ####################################
 # Parameters
 ####################################
 
 # Simulation parameters
-T = 5.0
-dt = 1e-3
+T = 1.0
+dt = 5e-3
 playback_rate = 1.0
 
 # Contact model parameters
@@ -30,7 +31,7 @@ hydroelastic_modulus = 1e6     # controls "squishiness" of collisions: lower is 
 resolution_hint = 0.01         # smaller means a finer mesh
 penetration_allowance = 0.02   # controls "softness" of collisions for point contact model
 mu = 0.5                       # friction coefficient
-contact_model = ContactModel.kHydroelasticWithFallback  # Hydroelastic, Point, or HydroelasticWithFallback
+contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
 mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 
 # Block parameters
@@ -44,19 +45,29 @@ pusher_mass = 1.0    # large inertia makes sense if pusher is connected to robot
 pusher_radius = 0.01
 
 # Initial state
-q0_pusher = np.array([0,length/2+pusher_radius])
+q0_pusher = np.array([0,length/2+pusher_radius-1e-3])
 q0_block = np.array([1,0,0,0, 0,0,height/2])
 q0 = np.hstack([q0_pusher, q0_block])
 v0 = np.zeros(8)
 x0 = np.hstack([q0,v0])
 
 # Target state
-x_nom = np.array([0,np.pi,0,0])
+x_nom = copy(x0)
+x_nom[7] -= 0.1
 
 # Quadratic cost
-Q = np.diag([1,1,0.1,0.1])
-R = 0.001*np.eye(1)
-Qf = np.diag([500,500,1,1])
+Qq_push = np.array([0,0])
+Qq_block = np.array([1,1,1,1, 100,100,1])
+Qv_push = np.array([0.1,0.1])
+Qv_block = np.array([1,1,1, 1,1,1])
+Q = np.diag(np.hstack([
+        Qq_push,
+        Qq_block,
+        Qv_push,
+        Qv_block]))
+
+R = 0.01*np.eye(2)
+Qf = Q
 
 ####################################
 # Tools for system setup
@@ -121,6 +132,15 @@ def create_system_model(builder):
     plant.AddJointActuator("pusher_y", pusher_y)
     pusher_y.set_default_positions([length/2+pusher_radius])
 
+    # Add a visualization of the target block position
+    q_block_nom = x_nom[2:9]
+    source = scene_graph.RegisterSource("block_nom")
+    X_nom = RigidTransform(Quaternion(q_block_nom[:4]), q_block_nom[4:])
+    geometry = GeometryInstance(X_nom, Box(length,width,height), "block_nom_geom")
+    geometry.set_illustration_properties(
+            MakePhongIllustrationProperties([0,1,0,0.5]))
+    scene_graph.RegisterAnchoredGeometry(source, geometry)
+
     # Turn off gravity
     #plant.mutable_gravity_field().set_gravity_vector([0,0,0])
     
@@ -170,9 +190,7 @@ if optimize:
     ilqr.SetTerminalCost(Qf)
 
     # Set initial guess
-    #np.random.seed(0)
-    #u_guess = 0.01*np.random.normal(size=(1,num_steps-1))
-    u_guess = np.zeros((1,num_steps-1))
+    u_guess = np.zeros((2,num_steps-1))
     ilqr.SetInitialGuess(u_guess)
 
     # Solve the optimization problem
@@ -181,16 +199,12 @@ if optimize:
     print(f"Optimal cost: {optimal_cost}")
     timesteps = np.arange(0.0,T,dt)
 
-    # Set initial conditions
-    plant.get_actuation_input_port().FixValue(plant_context, 0)
-    plant.SetPositionsAndVelocities(plant_context, x0)
-
 #####################################
 # Playback
 #####################################
 
     while True:
-        plant.get_actuation_input_port().FixValue(plant_context, 0)
+        plant.get_actuation_input_port().FixValue(plant_context, np.zeros(2))
         # Just keep playing back the trajectory
         for i in range(len(timesteps)):
             t = timesteps[i]
@@ -211,7 +225,7 @@ if simulate:
     
     # Fix zero input for now
     u = np.zeros(plant.num_actuators())
-    u[1] -= 1.0
+    u[1] -= 0.0
     plant.get_actuation_input_port().FixValue(plant_context, u)
 
     # Set initial state
