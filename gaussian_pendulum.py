@@ -1,0 +1,106 @@
+#!/usr/bin/env python
+
+##
+#
+# Testing uncertainty propagation using a simple pendulum model. 
+#
+##
+
+from pydrake.all import *
+import time
+import matplotlib.pyplot as plt
+
+def create_system_model(builder):
+    """
+    Create and return a plant and scene graph for the simple pendulum system.
+    """
+    # System parameters
+    dt = 1e-3
+    mass = 1.0
+    radius = 0.01
+    length = 0.5
+    damping = 0.1
+
+    # Create the plant and scene graph
+    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
+
+    # Create the pendulum object
+    pendulum = plant.AddModelInstance("pendulum")
+    rod = plant.AddRigidBody("rod", pendulum, SpatialInertia(mass, [0,0,0],
+                UnitInertia.SolidCylinder(radius, length)))
+    rod_com_frame = plant.GetFrameByName("rod")
+    X_base_com = RigidTransform(RotationMatrix(),[0,0,length/2])
+    rod_base_frame = plant.AddFrame(FixedOffsetFrame("rod_base",
+        rod_com_frame, X_base_com))
+    plant.AddJoint(RevoluteJoint("base_joint", plant.world_frame(),
+        rod_base_frame, [1,0,0], damping), )
+
+    # Add collision data
+   
+    # Add visualization data
+    plant.RegisterVisualGeometry(rod, RigidTransform(), 
+        Cylinder(radius, length), "rod_visual", [0.5,0.5,0.9,1.0])
+
+    plant.Finalize()
+
+    return plant, scene_graph
+
+if __name__=="__main__":
+    # Create the system model
+    builder = DiagramBuilder()
+    plant, scene_graph = create_system_model(builder)
+
+    DrakeVisualizer().AddToBuilder(builder, scene_graph)
+    ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+
+    diagram = builder.Build()
+    diagram_context = diagram.CreateDefaultContext()
+    plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
+
+    # Create an autodiff copy of the plant
+
+    # Set initial conditions
+    x0 = np.array([np.pi/2,0])
+    plant.SetPositionsAndVelocities(plant_context, x0)
+
+    # Set up recording of state trajectory
+    T = 5.0
+    N = int(T/plant.time_step())
+    x = np.zeros((plant.num_multibody_states(), N))
+
+    # Step through a simulation
+    t = 0.0
+    for i in range(N):
+        st = time.time()
+
+        # Record the current state x_k
+        x[:,i] = plant.GetPositionsAndVelocities(plant_context)
+
+        # Compute the discrete state update x_{k+1} = f(x_k)
+        state = diagram_context.get_mutable_discrete_state()
+        diagram.CalcDiscreteVariableUpdates(diagram_context, state)
+
+
+        # Set the time and publish (so the visualizer gets the new state)
+        diagram_context.SetTime(t)
+        diagram.Publish(diagram_context)
+      
+        # Update timestep and try to match real-time rate
+        t += plant.time_step()
+        sleep_time = st-time.time()+plant.time_step()-2e-4
+        #time.sleep(max(0,sleep_time))
+
+    # Make a plot of the state trajectory
+    t = np.arange(0,T,plant.time_step())
+    
+    plt.subplot(2,1,1)
+    plt.plot(t,x[0,:])
+    plt.ylabel("theta")
+
+    plt.subplot(2,1,2)
+    plt.plot(t,x[1,:])
+    plt.ylabel("theta dot")
+    plt.xlabel("time (s)")
+
+    plt.show()
+

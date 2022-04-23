@@ -21,7 +21,7 @@ optimize = True
 ####################################
 
 # Simulation parameters
-T = 1.0
+T = 0.5
 dt = 5e-3
 playback_rate = 1.0
 
@@ -45,7 +45,7 @@ pusher_mass = 1.0    # large inertia makes sense if pusher is connected to robot
 pusher_radius = 0.01
 
 # Initial state
-q0_pusher = np.array([0,length/2+pusher_radius-1e-3])
+q0_pusher = np.array([0, length/2+pusher_radius-1e-3])
 q0_block = np.array([1,0,0,0, 0,0,height/2])
 q0 = np.hstack([q0_pusher, q0_block])
 v0 = np.zeros(8)
@@ -126,12 +126,15 @@ def create_system_model(builder):
         plant.GetFrameByName("dummy1"), [1,0,0], -0.5, 0.5))
     pusher_y = plant.AddJoint(PrismaticJoint("pusher_y", plant.GetFrameByName("dummy1"),
         plant.GetFrameByName("dummy2"), [0,1,0], -0.5, 0.5))
+    #pusher_z = plant.AddJoint(PrismaticJoint("pusher_z", plant.GetFrameByName("dummy2"),
+    #    plant.GetFrameByName("pusher_body"), [0,0,1], -0.5, 0.5))
     pusher_z = plant.AddJoint(WeldJoint("pusher_z", plant.GetFrameByName("dummy2"),
         plant.GetFrameByName("pusher_body"), 
         RigidTransform(RotationMatrix(),[0,0,height/2])))
 
     plant.AddJointActuator("pusher_x", pusher_x)
     plant.AddJointActuator("pusher_y", pusher_y)
+    #plant.AddJointActuator("pusher_z", pusher_z)
     pusher_y.set_default_positions([length/2+pusher_radius])
 
     # Add a visualization of the target block position
@@ -185,7 +188,8 @@ if optimize:
 
     # Set up the optimizer
     num_steps = int(T/dt)
-    ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, autodiff=True)
+    ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, 
+            delta=1e-2, autodiff=True)
 
     # Define the optimization problem
     ilqr.SetInitialState(x0)
@@ -194,7 +198,7 @@ if optimize:
     ilqr.SetTerminalCost(Qf)
 
     # Set initial guess
-    u_guess = np.zeros((2,num_steps-1))
+    u_guess = np.zeros((plant.num_actuators(),num_steps-1))
     ilqr.SetInitialGuess(u_guess)
 
     # Solve the optimization problem
@@ -208,7 +212,8 @@ if optimize:
 #####################################
 
     while True:
-        plant.get_actuation_input_port().FixValue(plant_context, np.zeros(2))
+        plant.get_actuation_input_port().FixValue(plant_context, 
+                np.zeros(plant.num_actuators()))
         # Just keep playing back the trajectory
         for i in range(len(timesteps)):
             t = timesteps[i]
