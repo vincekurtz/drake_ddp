@@ -51,13 +51,15 @@ if __name__=="__main__":
     plant, scene_graph = create_system_model(builder)
 
     DrakeVisualizer().AddToBuilder(builder, scene_graph)
-    ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+    #ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
     diagram = builder.Build()
     diagram_context = diagram.CreateDefaultContext()
     plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
     # Create an autodiff copy of the plant
+    diagram_ad = diagram.ToAutoDiffXd()
+    diagram_context_ad = diagram_ad.CreateDefaultContext()
 
     # Set initial conditions
     x0 = np.array([np.pi/2,0])
@@ -66,7 +68,11 @@ if __name__=="__main__":
     # Set up recording of state trajectory
     T = 5.0
     N = int(T/plant.time_step())
-    x = np.zeros((plant.num_multibody_states(), N))
+    n = plant.num_multibody_states()
+    x = np.zeros((n, N))
+    
+    Sigma = np.zeros((n,n,N+1))
+    Sigma[:,:,0] = np.diag([1.0,1.0])
 
     # Step through a simulation
     t = 0.0
@@ -80,6 +86,16 @@ if __name__=="__main__":
         state = diagram_context.get_mutable_discrete_state()
         diagram.CalcDiscreteVariableUpdates(diagram_context, state)
 
+        # Compute the derivatives of the discrete state update f_x
+        x_ad = InitializeAutoDiff(x[:,i])
+        diagram_context_ad.SetDiscreteState(x_ad)
+        state_ad = diagram_context_ad.get_discrete_state()
+        diagram_ad.CalcDiscreteVariableUpdates(diagram_context_ad, state_ad)
+        x_next_ad = state_ad.get_vector().CopyToVector()
+        fx = ExtractGradient(x_next_ad)
+
+        # Use these derivatives to update the state covariance estimate
+        Sigma[:,:,i+1] = fx@Sigma[:,:,i]@fx.T
 
         # Set the time and publish (so the visualizer gets the new state)
         diagram_context.SetTime(t)
@@ -95,10 +111,16 @@ if __name__=="__main__":
     
     plt.subplot(2,1,1)
     plt.plot(t,x[0,:])
+    covariance_lb = x[0,:] - Sigma[0,0,:-1]
+    covariance_ub = x[0,:] + Sigma[0,0,:-1]
+    plt.fill_between(t, covariance_lb, covariance_ub, color='green', alpha=0.5)
     plt.ylabel("theta")
 
     plt.subplot(2,1,2)
     plt.plot(t,x[1,:])
+    covariance_lb = x[1,:] - Sigma[1,1,:-1]
+    covariance_ub = x[1,:] + Sigma[1,1,:-1]
+    plt.fill_between(t, covariance_lb, covariance_ub, color='green', alpha=0.5)
     plt.ylabel("theta dot")
     plt.xlabel("time (s)")
 
