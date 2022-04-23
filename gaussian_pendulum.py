@@ -33,13 +33,38 @@ def create_system_model(builder):
     rod_base_frame = plant.AddFrame(FixedOffsetFrame("rod_base",
         rod_com_frame, X_base_com))
     plant.AddJoint(RevoluteJoint("base_joint", plant.world_frame(),
-        rod_base_frame, [1,0,0], damping), )
+        rod_base_frame, [1,0,0], damping))
+    
+    rod_shape = Cylinder(radius, length)
 
-    # Add collision data
+    rod_props = ProximityProperties()
+    AddCompliantHydroelasticProperties(radius, 5e6, rod_props)
+    AddContactMaterial(friction=CoulombFriction(0.5,0.5), properties=rod_props)
+    plant.RegisterCollisionGeometry(rod, RigidTransform(), rod_shape,
+            "rod_collision", rod_props)
+
    
-    # Add visualization data
-    plant.RegisterVisualGeometry(rod, RigidTransform(), 
-        Cylinder(radius, length), "rod_visual", [0.5,0.5,0.9,1.0])
+    plant.RegisterVisualGeometry(rod, RigidTransform(), rod_shape, "rod_visual", 
+            [0.5,0.5,0.9,1.0])
+
+    # Add a box to collide with
+    box = plant.AddModelInstance("box")
+    box_body = plant.AddRigidBody("box", box, 
+            SpatialInertia(1.0, [0,0,0], UnitInertia.SolidBox(1,1,1)))
+    X_box = RigidTransform(RotationMatrix(),[0,0.5,0])
+    box_frame = plant.GetFrameByName("box")
+    plant.WeldFrames(plant.world_frame(), box_frame, X_box)
+
+    box_shape = Box(0.2,0.2,0.2)
+
+    box_props = ProximityProperties()
+    AddCompliantHydroelasticProperties(1.0, 5e5, box_props)
+    AddContactMaterial(dissipation=1, friction=CoulombFriction(0.5,0.5), properties=box_props)
+    plant.RegisterCollisionGeometry(box_body, RigidTransform(), box_shape,
+            "box_collision", box_props)
+
+    plant.RegisterVisualGeometry(box_body, RigidTransform(), box_shape, 
+            "box_visual", [0.5,0.9,0.5,1.0])
 
     plant.Finalize()
 
@@ -62,11 +87,11 @@ if __name__=="__main__":
     diagram_context_ad = diagram_ad.CreateDefaultContext()
 
     # Set initial conditions
-    x0 = np.array([np.pi/2,0])
+    x0 = np.array([0.8*np.pi,0])
     plant.SetPositionsAndVelocities(plant_context, x0)
 
     # Set up recording of state trajectory
-    T = 5.0
+    T = 2.0
     N = int(T/plant.time_step())
     n = plant.num_multibody_states()
     x = np.zeros((n, N))
@@ -104,7 +129,7 @@ if __name__=="__main__":
         # Update timestep and try to match real-time rate
         t += plant.time_step()
         sleep_time = st-time.time()+plant.time_step()-2e-4
-        #time.sleep(max(0,sleep_time))
+        time.sleep(max(0,sleep_time))
 
     # Make a plot of the state trajectory
     t = np.arange(0,T,plant.time_step())
