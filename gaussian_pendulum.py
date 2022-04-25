@@ -69,6 +69,28 @@ def create_system_model(builder):
 
     return plant, scene_graph
 
+def plot_mean_and_covariance(t, mu, Sigma):
+    """
+    Make a plot of the mean state (theta, theta_dot) together
+    with its covariance estimate as a green interval. 
+    """
+    # theta
+    plt.subplot(2,1,1)
+    plt.plot(t,mu[0,:])
+    covariance_lb = mu[0,:] - Sigma[0,0,:]
+    covariance_ub = mu[0,:] + Sigma[0,0,:]
+    plt.fill_between(t, covariance_lb, covariance_ub, color='green', alpha=0.5)
+    plt.ylabel("theta")
+
+    # theta dot
+    plt.subplot(2,1,2)
+    plt.plot(t,mu[1,:])
+    covariance_lb = mu[1,:] - Sigma[1,1,:]
+    covariance_ub = mu[1,:] + Sigma[1,1,:]
+    plt.fill_between(t, covariance_lb, covariance_ub, color='green', alpha=0.5)
+    plt.ylabel("theta dot")
+    plt.xlabel("time (s)")
+
 if __name__=="__main__":
     # Create the system model
     builder = DiagramBuilder()
@@ -96,7 +118,8 @@ if __name__=="__main__":
     x = np.zeros((n, N))
     
     Sigma = np.zeros((n,n,N+1))
-    Sigma[:,:,0] = np.diag([0.1,0.1])
+    Sigma0 = np.diag([0.1,0.1])
+    Sigma[:,:,0] = Sigma0
 
     # Step through a simulation
     t = 0.0
@@ -134,35 +157,37 @@ if __name__=="__main__":
     ns = 10
     xs = np.zeros((n,N,ns))
     for j in range(ns):
-        x0_j = np.random.multivariate_normal(x0, np.diag([0.01,0.01]))
+        x0_j = np.random.multivariate_normal(x0, Sigma0)
         plant.SetPositionsAndVelocities(plant_context, x0_j)
         for i in range(N):
                 xs[:,i,j] = plant.GetPositionsAndVelocities(plant_context)
                 state = diagram_context.get_mutable_discrete_state()
                 diagram.CalcDiscreteVariableUpdates(diagram_context, state)
+
+    # Compute sample mean and covariance
+    mu_sampled = np.mean(xs, axis=2)
+    Sigma_sampled = np.zeros((n,n,N))
+    for i in range(N):
+        summ = 0
+        for j in range(ns):
+            diff = (xs[:,i,j] - mu_sampled[:,i])[np.newaxis].T
+            Sigma_sampled[:,:,i] += diff@diff.T
+        Sigma_sampled[:,:,i] *= 1/(ns-1)
    
-    # Make a plot of the state trajectory
+    # Make plots
     t = np.arange(0,T,plant.time_step())
-    
+
+    plt.figure("Local Estimate")
+    plot_mean_and_covariance(t, x, Sigma[:,:,:-1])
+
+    plt.figure("Samples")
     plt.subplot(2,1,1)
-    plt.plot(t,x[0,:])
-    for j in range(ns):   # plot sampled trajectories
-        plt.plot(t,xs[0,:,j])
-    covariance_lb = x[0,:] - Sigma[0,0,:-1]
-    covariance_ub = x[0,:] + Sigma[0,0,:-1]
-    plt.fill_between(t, covariance_lb, covariance_ub, color='green', alpha=0.5)
-    plt.ylabel("theta")
-
+    plt.plot(t,xs[0,:,:])
     plt.subplot(2,1,2)
-    plt.plot(t,x[1,:])
-    for j in range(ns):   # plot sampled trajectories
-        plt.plot(t,xs[1,:,j])
-    covariance_lb = x[1,:] - Sigma[1,1,:-1]
-    covariance_ub = x[1,:] + Sigma[1,1,:-1]
-    plt.fill_between(t, covariance_lb, covariance_ub, color='green', alpha=0.5)
-    plt.ylabel("theta dot")
-    plt.xlabel("time (s)")
+    plt.plot(t,xs[1,:,:])
 
-
+    plt.figure("MC Estimate")
+    plot_mean_and_covariance(t, mu_sampled, Sigma_sampled)
+    
     plt.show()
 
