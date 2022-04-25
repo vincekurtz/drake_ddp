@@ -43,28 +43,27 @@ def create_system_model(builder):
     plant.RegisterCollisionGeometry(rod, RigidTransform(), rod_shape,
             "rod_collision", rod_props)
 
-   
     plant.RegisterVisualGeometry(rod, RigidTransform(), rod_shape, "rod_visual", 
             [0.5,0.5,0.9,1.0])
 
-    # Add a box to collide with
-    box = plant.AddModelInstance("box")
-    box_body = plant.AddRigidBody("box", box, 
-            SpatialInertia(1.0, [0,0,0], UnitInertia.SolidBox(1,1,1)))
-    X_box = RigidTransform(RotationMatrix(),[0,0.5,0])
-    box_frame = plant.GetFrameByName("box")
-    plant.WeldFrames(plant.world_frame(), box_frame, X_box)
+    ## Add a box to collide with
+    #box = plant.AddModelInstance("box")
+    #box_body = plant.AddRigidBody("box", box, 
+    #        SpatialInertia(1.0, [0,0,0], UnitInertia.SolidBox(1,1,1)))
+    #X_box = RigidTransform(RotationMatrix(),[0,0.5,0])
+    #box_frame = plant.GetFrameByName("box")
+    #plant.WeldFrames(plant.world_frame(), box_frame, X_box)
 
-    box_shape = Box(0.2,0.2,0.2)
+    #box_shape = Box(0.2,0.2,0.2)
 
-    box_props = ProximityProperties()
-    AddCompliantHydroelasticProperties(1.0, 5e5, box_props)
-    AddContactMaterial(dissipation=1, friction=CoulombFriction(0.5,0.5), properties=box_props)
-    plant.RegisterCollisionGeometry(box_body, RigidTransform(), box_shape,
-            "box_collision", box_props)
+    #box_props = ProximityProperties()
+    #AddCompliantHydroelasticProperties(1.0, 5e5, box_props)
+    #AddContactMaterial(dissipation=1, friction=CoulombFriction(0.5,0.5), properties=box_props)
+    #plant.RegisterCollisionGeometry(box_body, RigidTransform(), box_shape,
+    #        "box_collision", box_props)
 
-    plant.RegisterVisualGeometry(box_body, RigidTransform(), box_shape, 
-            "box_visual", [0.5,0.9,0.5,1.0])
+    #plant.RegisterVisualGeometry(box_body, RigidTransform(), box_shape, 
+    #        "box_visual", [0.5,0.9,0.5,1.0])
 
     plant.Finalize()
 
@@ -97,7 +96,7 @@ if __name__=="__main__":
     x = np.zeros((n, N))
     
     Sigma = np.zeros((n,n,N+1))
-    Sigma[:,:,0] = np.diag([1.0,1.0])
+    Sigma[:,:,0] = np.diag([0.1,0.1])
 
     # Step through a simulation
     t = 0.0
@@ -129,13 +128,26 @@ if __name__=="__main__":
         # Update timestep and try to match real-time rate
         t += plant.time_step()
         sleep_time = st-time.time()+plant.time_step()-2e-4
-        time.sleep(max(0,sleep_time))
+        #time.sleep(max(0,sleep_time))
 
+    # Sample from initial distribution and simulate
+    ns = 10
+    xs = np.zeros((n,N,ns))
+    for j in range(ns):
+        x0_j = np.random.multivariate_normal(x0, np.diag([0.01,0.01]))
+        plant.SetPositionsAndVelocities(plant_context, x0_j)
+        for i in range(N):
+                xs[:,i,j] = plant.GetPositionsAndVelocities(plant_context)
+                state = diagram_context.get_mutable_discrete_state()
+                diagram.CalcDiscreteVariableUpdates(diagram_context, state)
+   
     # Make a plot of the state trajectory
     t = np.arange(0,T,plant.time_step())
     
     plt.subplot(2,1,1)
     plt.plot(t,x[0,:])
+    for j in range(ns):   # plot sampled trajectories
+        plt.plot(t,xs[0,:,j])
     covariance_lb = x[0,:] - Sigma[0,0,:-1]
     covariance_ub = x[0,:] + Sigma[0,0,:-1]
     plt.fill_between(t, covariance_lb, covariance_ub, color='green', alpha=0.5)
@@ -143,11 +155,14 @@ if __name__=="__main__":
 
     plt.subplot(2,1,2)
     plt.plot(t,x[1,:])
+    for j in range(ns):   # plot sampled trajectories
+        plt.plot(t,xs[1,:,j])
     covariance_lb = x[1,:] - Sigma[1,1,:-1]
     covariance_ub = x[1,:] + Sigma[1,1,:-1]
     plt.fill_between(t, covariance_lb, covariance_ub, color='green', alpha=0.5)
     plt.ylabel("theta dot")
     plt.xlabel("time (s)")
+
 
     plt.show()
 

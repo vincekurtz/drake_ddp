@@ -21,7 +21,7 @@ optimize = True
 ####################################
 
 # Simulation parameters
-T = 0.5
+T = 1.5
 dt = 5e-3
 playback_rate = 1.0
 
@@ -166,7 +166,7 @@ plant, scene_graph = create_system_model(builder)
 
 # Connect to visualizer
 DrakeVisualizer().AddToBuilder(builder, scene_graph)
-ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+#ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
 # Finailze the diagram
 diagram = builder.Build()
@@ -189,7 +189,7 @@ if optimize:
     # Set up the optimizer
     num_steps = int(T/dt)
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, 
-            delta=1e-2, autodiff=True)
+            delta=1e-2, autodiff=False)
 
     # Define the optimization problem
     ilqr.SetInitialState(x0)

@@ -19,7 +19,7 @@ playback = True   # Visualize the optimal trajectory by playing it back.
                    # trajectory from a file.
 debug_gradients = False
 
-scenario = "forward"   # "lift", "forward", or "side"
+scenario = "lift"   # "lift", "forward", or "side"
 save_file = "data/" + scenario + ".npz"
 
 ####################################
@@ -27,7 +27,7 @@ save_file = "data/" + scenario + ".npz"
 ####################################
 
 T = 0.5
-dt = 5e-3
+dt = 1e-3
 playback_rate = 1.0
 
 # Some useful joint angle definitions
@@ -37,7 +37,7 @@ q_push = np.array([0.0, np.pi/4+0.17, np.pi, 4.4-2*np.pi, 0, 1.2, np.pi/2])
 q_wrap = np.pi/180*np.array([55, 125, 114, 244, 217, 45, 8])
 
 # Some useful ball pose definitions
-radius = 0.1   # of ball
+radius = 0.11  # of ball
 q_ball_start = np.array([0,0,0,1,0.6,0.0,radius])
 q_ball_target = np.array([0,0,0,1,0.6,0.0,radius])
 if scenario == "lift":
@@ -233,7 +233,7 @@ if optimize:
     # Set up the optimizer
     num_steps = int(T/dt)
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-            beta=0.5, delta=1e-3, gamma=0, autodiff=True)
+            beta=0.5, delta=1e-3, gamma=0, autodiff=False)
 
     # Define the optimization problem
     ilqr.SetInitialState(x0)
