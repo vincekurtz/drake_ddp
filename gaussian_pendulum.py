@@ -46,24 +46,24 @@ def create_system_model(builder):
     plant.RegisterVisualGeometry(rod, RigidTransform(), rod_shape, "rod_visual", 
             [0.5,0.5,0.9,1.0])
 
-    ## Add a box to collide with
-    #box = plant.AddModelInstance("box")
-    #box_body = plant.AddRigidBody("box", box, 
-    #        SpatialInertia(1.0, [0,0,0], UnitInertia.SolidBox(1,1,1)))
-    #X_box = RigidTransform(RotationMatrix(),[0,0.5,0])
-    #box_frame = plant.GetFrameByName("box")
-    #plant.WeldFrames(plant.world_frame(), box_frame, X_box)
+    # Add a box to collide with
+    box = plant.AddModelInstance("box")
+    box_body = plant.AddRigidBody("box", box, 
+            SpatialInertia(1.0, [0,0,0], UnitInertia.SolidBox(1,1,1)))
+    X_box = RigidTransform(RotationMatrix(),[0,0.5,0])
+    box_frame = plant.GetFrameByName("box")
+    plant.WeldFrames(plant.world_frame(), box_frame, X_box)
 
-    #box_shape = Box(0.2,0.2,0.2)
+    box_shape = Box(0.2,0.2,0.2)
 
-    #box_props = ProximityProperties()
-    #AddCompliantHydroelasticProperties(1.0, 5e5, box_props)
-    #AddContactMaterial(dissipation=1, friction=CoulombFriction(0.5,0.5), properties=box_props)
-    #plant.RegisterCollisionGeometry(box_body, RigidTransform(), box_shape,
-    #        "box_collision", box_props)
+    box_props = ProximityProperties()
+    AddCompliantHydroelasticProperties(1.0, 5e5, box_props)
+    AddContactMaterial(dissipation=1, friction=CoulombFriction(0.5,0.5), properties=box_props)
+    plant.RegisterCollisionGeometry(box_body, RigidTransform(), box_shape,
+            "box_collision", box_props)
 
-    #plant.RegisterVisualGeometry(box_body, RigidTransform(), box_shape, 
-    #        "box_visual", [0.5,0.9,0.5,1.0])
+    plant.RegisterVisualGeometry(box_body, RigidTransform(), box_shape, 
+            "box_visual", [0.5,0.9,0.5,1.0])
 
     plant.Finalize()
 
@@ -108,7 +108,7 @@ if __name__=="__main__":
     diagram_context_ad = diagram_ad.CreateDefaultContext()
 
     # Set initial conditions
-    x0 = np.array([0.8*np.pi,0])
+    x0 = np.array([0.7*np.pi,0])
     plant.SetPositionsAndVelocities(plant_context, x0)
 
     # Set up recording of state trajectory
