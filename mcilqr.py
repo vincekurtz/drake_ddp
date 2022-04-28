@@ -69,12 +69,12 @@ class MonteCarloIterativeLQR():
 
         # Initial and target states
         self.z0 = np.zeros(self.n)
-        self.x_nom = np.zeros(self.nx)
+        self.z_nom = np.zeros(self.nx)
 
         # Quadratic cost terms
-        self.Q = np.eye(self.nx)
+        self.Q = np.eye(self.n)
         self.R = np.eye(self.m)
-        self.Qf = np.eye(self.nx)
+        self.Qf = np.eye(self.n)
 
         # Arrays to store best guess of control and state trajectory
         self.z_bar = np.zeros((self.n,self.N))
@@ -106,7 +106,7 @@ class MonteCarloIterativeLQR():
         """
         self.z0 = np.random.multivariate_normal(mu, Sigma,
                 size=self.ns).flatten()
-    
+
     def SetTargetState(self, x_nom):
         """
         Fix the target state that we're trying to drive the system to.
@@ -114,7 +114,8 @@ class MonteCarloIterativeLQR():
         Args:
             x_nom:  Vector containing the target system state
         """
-        self.x_nom = np.asarray(x_nom).reshape((self.n,))
+        x_nom = np.asarray(x_nom).reshape((self.nx,))
+        self.z_nom = np.kron(np.ones(self.ns), x_nom)
 
     def SetRunningCost(self, Q, R):
         """
@@ -123,13 +124,13 @@ class MonteCarloIterativeLQR():
             (x-x_nom)'Q(x-x_nom) + u'Ru
 
         Args:
-            Q:  The (n,n) state penalty matrix
+            Q:  The (nx,nx) state penalty matrix
             R:  The (m,m) control penalty matrix
         """
-        assert Q.shape == (self.n,self.n)
+        assert Q.shape == (self.nx,self.nx)
         assert R.shape == (self.m,self.m)
-
-        self.Q = Q
+        
+        self.Q = 1/self.ns * np.kron(np.eye(self.ns), Q)
         self.R = R
 
     def SetTerminalCost(self, Qf):
@@ -139,10 +140,11 @@ class MonteCarloIterativeLQR():
             (x-x_nom)'Qf(x-x_nom)
 
         Args:
-            Qf: The (n,n) final state penalty matrix
+            Qf: The (nx,nx) final state penalty matrix
         """
-        assert Qf.shape == (self.n, self.n)
-        self.Qf = Qf
+        assert Qf.shape == (self.nx, self.nx)
+        
+        self.Qf = 1/self.ns * np.kron(np.eye(self.ns), Qf)
     
     def SetInitialGuess(self, u_guess):
         """
@@ -153,6 +155,23 @@ class MonteCarloIterativeLQR():
         """
         assert u_guess.shape == (self.m, self.N-1)
         self.u_bar = u_guess
+
+    def _running_cost(self, z, u):
+        """
+        Return the value of the (quadratic) running cost
+            
+            l(z,u) = 1/ns * sum_i[ x'Qx + u'Ru ]
+
+        for the given state and input values.
+
+        Args:
+            z:  numpy array representing state samples z = [x0,x1,...]
+            u:  numpy array representing control
+
+        Returns:
+            l:  The running cost (scalar)
+        """
+        return (z-self.z_nom).T@self.Q@(z-self.z_nom) + u.T@self.R@u
 
     def _running_cost_partials(self, z, u):
         """
@@ -173,13 +192,30 @@ class MonteCarloIterativeLQR():
             luu:    2nd order partial w.r.t. u
             luz:    2nd order partial w.r.t. u and z
         """
-        lz = 2*self.Q@z - 2*self.x_nom.T@self.Q
-        lu = 2*self.R@u
+
+        lz = 2*self.Q@z - 2*self.z_nom.T@self.Q
         lzz = 2*self.Q
+        lu = 2*self.R@u
         luu = 2*self.R
         luz = np.zeros((self.m,self.n))
 
         return (lz, lu, lzz, luu, luz)
+
+    def _terminal_cost(self, z):
+        """
+        Return the (quadratic) terminal cost
+
+            lf(z) = 1/ns * sum_i[ x'Qfx ]
+
+        for the given state values. 
+
+        Args:
+            z: numpy array representing state samples z = [x0,x1,...]
+
+        Returns:
+            lf: The (scalar) terminal cost
+        """
+        return (z-self.z_nom).T@self.Qf@(z-self.z_nom)
 
     def _terminal_cost_partials(self, z):
         """
@@ -196,7 +232,7 @@ class MonteCarloIterativeLQR():
             lf_z:   gradient of terminal cost
             lf_zz:  hessian of terminal cost
         """
-        lf_z = 2*self.Qf@z - 2*self.x_nom.T@self.Qf
+        lf_z = 2*self.Qf@z - 2*self.z_nom.T@self.Qf
         lf_zz = 2*self.Qf
 
         return (lf_z, lf_zz)
@@ -216,18 +252,22 @@ class MonteCarloIterativeLQR():
         Returns:
             z_next: An (n,) numpy array representing the next state samples
         """
-        x = z  # DEBUG: this should eventually go in a for loop
+        z_next = np.zeros(self.n)
 
-        # Set input and state variables in our stored model accordingly
-        self.context.SetDiscreteState(x)
-        self.input_port.FixValue(self.context, u)
+        for i in range(self.ns):
+            # Get state for this sample
+            x = z[i*self.nx:(i+1)*self.nx]
 
-        # Compute the forward dynamics x_next = f(x,u)
-        state = self.context.get_discrete_state()
-        self.system.CalcDiscreteVariableUpdates(self.context, state)
-        x_next = state.get_vector().value().flatten()
+            # Set input and state variables in our stored model accordingly
+            self.context.SetDiscreteState(x)
+            self.input_port.FixValue(self.context, u)
 
-        z_next = x_next
+            # Compute the forward dynamics x_next = f(x,u)
+            state = self.context.get_discrete_state()
+            self.system.CalcDiscreteVariableUpdates(self.context, state)
+            x_next = state.get_vector().value().flatten()
+
+            z_next[i*self.nx:(i+1)*self.nx] = x_next
 
         return z_next
 
@@ -241,30 +281,35 @@ class MonteCarloIterativeLQR():
 
         using automatic differentiation.
         """
-        x = z
+        fz = np.zeros((self.n, self.n))
+        fu = np.zeros((self.n, self.m))
 
-        # Create autodiff versions of x and u
-        xu = np.hstack([x,u])
-        xu_ad = InitializeAutoDiff(xu)
-        x_ad = xu_ad[:self.n]
-        u_ad = xu_ad[self.n:]
+        for i in range(self.ns):
+            # Get state sample
+            i0 = i*self.nx
+            iF = (i+1)*self.nx
+            x = z[i0:iF]
 
-        # Set input and state variables in our stored model accordingly
-        self.context_ad.SetDiscreteState(x_ad)
-        self.input_port_ad.FixValue(self.context_ad, u_ad)
+            # Create autodiff versions of x and u
+            xu = np.hstack([x,u])
+            xu_ad = InitializeAutoDiff(xu)
+            x_ad = xu_ad[:self.nx]
+            u_ad = xu_ad[self.nx:]
 
-        # Compute the forward dynamics x_next = f(x,u)
-        state = self.context_ad.get_discrete_state()
-        self.system_ad.CalcDiscreteVariableUpdates(self.context_ad, state)
-        x_next = state.get_vector().CopyToVector()
-       
-        # Compute partial derivatives
-        G = ExtractGradient(x_next)
-        fx = G[:,:self.n]
-        fu = G[:,self.n:]
+            # Set input and state variables in our stored model accordingly
+            self.context_ad.SetDiscreteState(x_ad)
+            self.input_port_ad.FixValue(self.context_ad, u_ad)
 
-        fz = fx 
-        
+            # Compute the forward dynamics x_next = f(x,u)
+            state = self.context_ad.get_discrete_state()
+            self.system_ad.CalcDiscreteVariableUpdates(self.context_ad, state)
+            x_next = state.get_vector().CopyToVector()
+           
+            # Compute partial derivatives
+            G = ExtractGradient(x_next)
+            fz[i0:iF,i0:iF] = G[:,:self.nx]
+            fu[i0:iF,:] = G[:,self.nx:]
+
         return (fz, fu)
 
     def _linesearch(self, L_last):
@@ -313,9 +358,10 @@ class MonteCarloIterativeLQR():
                     L = np.inf
                     break
 
-                L += (z[:,t]-self.x_nom).T@self.Q@(z[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
+                L += self._running_cost(z[:,t], u[:,t])
                 expected_improvement += -eps*(1-eps/2)*self.dV_coeff[t]
-            L += (z[:,-1]-self.x_nom).T@self.Qf@(z[:,-1]-self.x_nom)
+
+            L += self._terminal_cost(z[:,-1])
 
             # Chech whether the improvement is sufficient
             improvement = L_last - L

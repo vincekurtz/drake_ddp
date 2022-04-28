@@ -133,18 +133,20 @@ plant_, scene_graph_ = create_system_model(builder_)
 builder_.ExportInput(plant_.get_actuation_input_port(),"control")
 system_ = builder_.Build()
 
-mc = True  # use monte-carlo/sotchastic version
+mc = True  # use monte-carlo/stochastic version
 
 # Set up the optimizer
 num_steps = int(T/dt)
 if mc:
-    ilqr = MonteCarloIterativeLQR(system_, num_steps, 1)
+    ilqr = MonteCarloIterativeLQR(system_, num_steps, 2, seed=0)
 else:
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps)
 
 # Define initial and target states
 if mc:
-    ilqr.SetInitialDistribution(x0,0.0*np.eye(2))
+    mu = x0
+    Sigma = np.diag([0.1,0.0])
+    ilqr.SetInitialDistribution(mu,Sigma)
 else:
     ilqr.SetInitialState(x0)
 ilqr.SetTargetState(x_nom)
@@ -165,6 +167,12 @@ timesteps = np.arange(0.0,T,dt)
 #####################################
 # Playback
 #####################################
+
+if mc:
+    # If we did monte-carlo simulation, just take one of the
+    # state samples
+    i = 1
+    states = states[i*2:(i+1)*2,:]
 
 while True:
     # Just keep playing back the trajectory
