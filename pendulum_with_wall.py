@@ -11,6 +11,7 @@ from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
 from mcilqr import MonteCarloIterativeLQR
 import time
+import matplotlib.pyplot as plt
 
 ####################################
 # Parameters
@@ -134,18 +135,19 @@ builder_.ExportInput(plant_.get_actuation_input_port(),"control")
 system_ = builder_.Build()
 
 mc = True  # use monte-carlo/stochastic version
+ns = 4     # number of monte-carlo samples to use
 
 # Set up the optimizer
 num_steps = int(T/dt)
 if mc:
-    ilqr = MonteCarloIterativeLQR(system_, num_steps, 2, seed=0)
+    ilqr = MonteCarloIterativeLQR(system_, num_steps, ns, seed=0)
 else:
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps)
 
 # Define initial and target states
 if mc:
     mu = x0
-    Sigma = np.diag([0.1,0.0])
+    Sigma = np.diag([0.05,0.0])
     ilqr.SetInitialDistribution(mu,Sigma)
 else:
     ilqr.SetInitialState(x0)
@@ -168,10 +170,25 @@ timesteps = np.arange(0.0,T,dt)
 # Playback
 #####################################
 
+# Make some plot of the state trajectories
+plt.subplot(3,1,1)
+thetas = states[0::2,:]
+theta_dots = states[1::2,:]
+plt.plot(timesteps,thetas.T)
+plt.ylabel("theta")
+plt.subplot(3,1,2)
+plt.plot(timesteps,theta_dots.T)
+plt.ylabel("theta_dot")
+plt.subplot(3,1,3)
+plt.plot(timesteps[:-1],inputs.T)
+plt.ylabel("torque")
+plt.xlabel("time")
+plt.show()
+
 if mc:
     # If we did monte-carlo simulation, just take one of the
     # state samples
-    i = 1
+    i = 0
     states = states[i*2:(i+1)*2,:]
 
 while True:
