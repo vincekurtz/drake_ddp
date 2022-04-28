@@ -1,6 +1,7 @@
 ##
 #
-# A simple implementation of iterative LQR (iLQR) for discrete-time systems in Drake.
+# Implementation of a stochastic optimal control algorithm based
+# on a Monte-Carlo variant of iLQR.
 #
 ##
 
@@ -8,34 +9,38 @@ from pydrake.all import *
 import time
 import numpy as np
 
-class IterativeLinearQuadraticRegulator():
+class MonteCarloIterativeLQR():
     """
-    Set up and solve a trajectory optimization problem of the form
+    Set up and solve a stochastic trajectory optimization problem of the form 
 
-        min_{u} sum{ (x-x_nom)'Q(x-x_nom) + u'Ru } + (x-x_nom)'Qf(x-x_nom)
+        min_{u} E[ sum{ (x-x_nom)''Q(x-x_nom) + u'Ru } + (x-x_nom)'Qf(x-x_nom) ]
         s.t.    x_{t+1} = f(x_t, u_t)
+                x0 ~ N(mu, Sigma)
 
-    using iLQR.
+    using a monte-carlo variant of iLQR. The basic idea is to sample x0 from the
+    initial distribution and then optimize over all samples simultaneously,
+    where the same control tape is used for all of the samples. 
     """
-    def __init__(self, system, num_timesteps, 
-            input_port_index=0, delta=1e-2, beta=0.95, gamma=0.0,
-            autodiff=True):
+    def __init__(self, system, num_timesteps, num_samples, seed=None, 
+            input_port_index=0, delta=1e-2,beta=0.95, gamma=0.0):
         """
         Args:
             system:             Drake System describing the discrete-time dynamics
                                  x_{t+1} = f(x_t,u_t). Must be discrete-time.
             num_timesteps:      Number of timesteps to consider in the optimization.
-            input_port_index:   InputPortIndex for the control input u_t. Default is to
-                                 use the first port. 
-            delta:              Termination criterion - the algorithm ends when the improvement
-                                 in the total cost is less than delta. 
-            beta:               Linesearch parameter in (0,1). Higher values lead to smaller
-                                 linesearch steps. 
-            gamma:              Linesearch parameter in [0,1). Higher values mean linesearch
-                                 is performed more often in hopes of larger cost reductions.
-            autodiff:           Boolean indicating whether to use automatic differentiation
-                                 to compute dynamics gradients. If False, we use a (faster) 
-                                 custom approximation of the gradients instead.
+            num_samples:        Number of samples to take from the initial
+                                 distribution, to approximate the expected cost.
+            seed:               Random seed to use for sampling from the initial
+                                 distribution.
+            input_port_index:   InputPortIndex for the control input u_t. Default is
+                                 to use the first port. 
+            delta:              Termination criterion - the algorithm ends when the 
+                                 improvement in the total cost is less than delta. 
+            beta:               Linesearch parameter in (0,1). Higher values lead 
+                                 to smaller linesearch steps. 
+            gamma:              Linesearch parameter in [0,1). Higher values mean 
+                                 linesearch is performed more often in hopes of
+                                 larger cost reductions.
         """
         assert system.IsDifferenceEquationSystem()[0],  "must be a discrete-time system"
 
@@ -50,41 +55,36 @@ class IterativeLinearQuadraticRegulator():
         self.context_ad = self.system_ad.CreateDefaultContext()
         self.input_port_ad = self.system_ad.get_input_port(input_port_index)
         
-        # Extract the MultibodyPlant model from the given system. 
-        # The system in this case must include a MultibodyPlant called "plant"
-        # which is attached to a corresponding scene graph (for geometry computations)
-        self.plant = self.system.GetSubsystemByName("plant")
-        self.plant_context = self.system.GetMutableSubsystemContext(self.plant, self.context)
-           
         # Set some parameters
         self.N = num_timesteps
+        self.ns = num_samples
         self.delta = delta
         self.beta = beta
         self.gamma = gamma
-        self.autodiff = autodiff
 
         # Define state and input sizes
-        self.n = self.context.get_discrete_state_vector().size()
+        self.nx = self.context.get_discrete_state_vector().size()
+        self.n = self.nx*num_samples    # state is z = [x0,x1,...,x{ns}]
         self.m = self.input_port.size()
 
         # Initial and target states
-        self.x0 = np.zeros(self.n)
-        self.x_xom = np.zeros(self.n)
+        self.z0 = np.zeros(self.n)
+        self.x_nom = np.zeros(self.nx)
 
         # Quadratic cost terms
-        self.Q = np.eye(self.n)
+        self.Q = np.eye(self.nx)
         self.R = np.eye(self.m)
-        self.Qf = np.eye(self.n)
+        self.Qf = np.eye(self.nx)
 
         # Arrays to store best guess of control and state trajectory
-        self.x_bar = np.zeros((self.n,self.N))
+        self.z_bar = np.zeros((self.n,self.N))
         self.u_bar = np.zeros((self.m,self.N-1))
 
         # Arrays to store dynamics gradients
-        self.fx = np.zeros((self.n,self.n,self.N-1))
+        self.fz = np.zeros((self.n,self.n,self.N-1))
         self.fu = np.zeros((self.n,self.m,self.N-1))
 
-        # Local feedback gains u = u_bar - eps*kappa_t - K_t*(x-x_bar)
+        # Local feedback gains u = u_bar - eps*kappa_t - K_t*(z-z_bar)
         self.kappa = np.zeros((self.m,self.N-1))
         self.K = np.zeros((self.m,self.n,self.N-1))
 
@@ -92,15 +92,21 @@ class IterativeLinearQuadraticRegulator():
         # reduction in cost dV = sum_t eps*(1-eps/2)*Qu'*Quu^{-1}*Qu
         self.dV_coeff = np.zeros(self.N-1)
 
-    def SetInitialState(self, x0):
-        """
-        Fix the initial condition for the optimization.
+        # Set seed for pseudorandom number generation
+        np.random.seed(seed)
 
-        Args:
-            x0: Vector containing the initial state of the system
+    def SetInitialDistribution(self, mu, Sigma):
         """
-        self.x0 = x0
+        Define the distribution of initial states,
 
+            x0 ~ N(mu, Sigma).
+
+        This method takes num_samples samples from this distribution to
+        use for the optimization.
+        """
+        self.z0 = np.random.multivariate_normal(mu, Sigma,
+                size=self.ns).flatten()
+    
     def SetTargetState(self, x_nom):
         """
         Fix the target state that we're trying to drive the system to.
@@ -148,70 +154,70 @@ class IterativeLinearQuadraticRegulator():
         assert u_guess.shape == (self.m, self.N-1)
         self.u_bar = u_guess
 
-    def SetControlLimits(self, u_min, u_max):
-        pass
-
-    def _running_cost_partials(self, x, u):
+    def _running_cost_partials(self, z, u):
         """
         Return the partial derivatives of the (quadratic) running cost
 
-            l = x'Qx + u'Ru
+            l(z,u) = 1/ns * sum_i[ x'Qx + u'Ru ]
 
         for the given state and input values.
 
         Args:
-            x:  numpy array representing state
+            z:  numpy array representing state samples z = [x0,x1,...]
             u:  numpy array representing control
 
         Returns:
-            lx:     1st order partial w.r.t. x
+            lz:     1st order partial w.r.t. z
             lu:     1st order partial w.r.t. u
-            lxx:    2nd order partial w.r.t. x
+            lzz:    2nd order partial w.r.t. z
             luu:    2nd order partial w.r.t. u
-            lux:    2nd order partial w.r.t. u and x
+            luz:    2nd order partial w.r.t. u and z
         """
-        lx = 2*self.Q@x - 2*self.x_nom.T@self.Q
+        lz = 2*self.Q@z - 2*self.x_nom.T@self.Q
         lu = 2*self.R@u
-        lxx = 2*self.Q
+        lzz = 2*self.Q
         luu = 2*self.R
-        lux = np.zeros((self.m,self.n))
+        luz = np.zeros((self.m,self.n))
 
-        return (lx, lu, lxx, luu, lux)
+        return (lz, lu, lzz, luu, luz)
 
-    def _terminal_cost_partials(self, x):
+    def _terminal_cost_partials(self, z):
         """
         Return the partial derivatives of the (quadratic) terminal cost
 
-            lf = x'Qfx
+            lf(z) = 1/ns * sum_i[ x'Qfx ]
 
         for the given state values. 
 
         Args:
-            x: numpy array representing state
+            z: numpy array representing state samples z = [x0,x1,...]
 
         Returns:
-            lf_x:   gradient of terminal cost
-            lf_xx:  hessian of terminal cost
+            lf_z:   gradient of terminal cost
+            lf_zz:  hessian of terminal cost
         """
-        lf_x = 2*self.Qf@x - 2*self.x_nom.T@self.Qf
-        lf_xx = 2*self.Qf
+        lf_z = 2*self.Qf@z - 2*self.x_nom.T@self.Qf
+        lf_zz = 2*self.Qf
 
-        return (lf_x, lf_xx)
+        return (lf_z, lf_zz)
     
-    def _calc_dynamics(self, x, u):
+    def _calc_dynamics(self, z, u):
         """
-        Given a system state (x) and a control input (u),
+        Given a set of system state samples (z) and a control input (u),
         compute the next state 
 
-            x_next = f(x,u)
+            z_next = f(z,u)
 
         Args:   
-            x:  An (n,) numpy array representing the state
+            z:  An (n,) numpy array representing the state samples
+                 z = [x0,x1,...]
             u:  An (m,) numpy array representing the control input
 
         Returns:
-            x_next: An (n,) numpy array representing the next state
+            z_next: An (n,) numpy array representing the next state samples
         """
+        x = z  # DEBUG: this should eventually go in a for loop
+
         # Set input and state variables in our stored model accordingly
         self.context.SetDiscreteState(x)
         self.input_port.FixValue(self.context, u)
@@ -221,26 +227,22 @@ class IterativeLinearQuadraticRegulator():
         self.system.CalcDiscreteVariableUpdates(self.context, state)
         x_next = state.get_vector().value().flatten()
 
-        return x_next
+        z_next = x_next
 
+        return z_next
 
-    def _calc_dynamics_partials(self, x, u):
+    def _calc_dynamics_partials(self, z, u):
         """
         Compute dynamics partials 
 
-            x_next = f(x,u)
-            fx = partial f(x,u) / partial x
-            fu = partial f(x,u) / partial u
+            x_next = f(z,u)
+            fx = partial f(z,u) / partial z
+            fu = partial f(z,u) / partial u
+
+        using automatic differentiation.
         """
-        if self.autodiff:
-            return self._calc_dynamics_partials_ad(x,u)
-        else:
-            return self._calc_dynamics_partials_custom(x,u)
-    
-    def _calc_dynamics_partials_ad(self, x, u):
-        """
-        Compute dynamics partials using automatic differentiation.
-        """
+        x = z
+
         # Create autodiff versions of x and u
         xu = np.hstack([x,u])
         xu_ad = InitializeAutoDiff(xu)
@@ -260,58 +262,10 @@ class IterativeLinearQuadraticRegulator():
         G = ExtractGradient(x_next)
         fx = G[:,:self.n]
         fu = G[:,self.n:]
+
+        fz = fx 
         
-        return (fx, fu)
-
-    def _calc_dynamics_partials_finite_diff(self, x, u):
-        """
-        Compute dynamics partials using finite differences.
-        """
-        # We can compute fu directly
-        self.plant.SetPositionsAndVelocities(self.plant_context, x)
-        M = self.plant.CalcMassMatrix(self.plant_context)
-        B = self.plant.MakeActuationMatrix()
-        N = CalcN(self.plant, self.plant_context)
-        dt = self.plant.time_step()
-        dv_du = dt*np.linalg.inv(M)@B
-        dq_du = dt*N@dv_du
-        fu = np.vstack([dq_du, dv_du])
-
-        # We can compute fx with finite differences
-        fx = np.zeros((self.n, self.n))
-
-        # Compute f(x,u) as baseline
-        self.context.SetDiscreteState(x)
-        self.input_port.FixValue(self.context, u)
-        state = self.context.get_discrete_state()
-        self.system.CalcDiscreteVariableUpdates(self.context, state)
-        f = state.get_vector().CopyToVector()
-
-        for i in range(self.n):
-            eps = 1e-8
-            delta = np.zeros(self.n)
-            delta[i] = eps
-
-            # compute f(x+delta, u)
-            self.context.SetDiscreteState(x+delta)
-            self.system.CalcDiscreteVariableUpdates(self.context, state)
-            f_delta = state.get_vector().CopyToVector()
-
-            # approximate fx = [f(x+delta,u) - f(x,u)]/eps
-            fx[:,i] = (f_delta- f)/eps
-
-        return (fx, fu)
-
-    def _calc_dynamics_partials_custom(self, x, u):
-        """
-        Compute dynamics partials using some (faster) custom methods.
-        """
-        self.context.SetDiscreteState(x)
-        self.input_port.FixValue(self.context, u)
-        x_next, fx, fu = \
-                self.plant.DiscreteDynamicsWithApproximateGradients(self.plant_context)
-
-        return (fx, fu)
+        return (fz, fu)
 
     def _linesearch(self, L_last):
         """
@@ -320,7 +274,7 @@ class IterativeLinearQuadraticRegulator():
 
         This involves simulating the system according to the control law
 
-            u = u_bar - eps*kappa - K*(x-x_bar).
+            u = u_bar - eps*kappa - K*(z-z_bar).
 
         and reducing eps by a factor of beta until the improvement in
         total cost is greater than gamma*(expected cost reduction)
@@ -330,7 +284,7 @@ class IterativeLinearQuadraticRegulator():
 
         Returns:
             eps:        Linesearch parameter
-            x:          (n,N) numpy array of new states
+            z:          (n,N) numpy array of new state samples
             u:          (m,N-1) numpy array of new control inputs
             L:          Total cost/loss associated with the new trajectory
             n_iters:    Number of linesearch iterations taken
@@ -343,15 +297,15 @@ class IterativeLinearQuadraticRegulator():
             # Simulate system forward using the given eps value
             L = 0
             expected_improvement = 0
-            x = np.zeros((self.n,self.N))
+            z = np.zeros((self.n,self.N))
             u = np.zeros((self.m,self.N-1))
 
-            x[:,0] = self.x0
+            z[:,0] = self.z0
             for t in range(0,self.N-1):
-                u[:,t] = self.u_bar[:,t] - eps*self.kappa[:,t] - self.K[:,:,t]@(x[:,t] - self.x_bar[:,t])
+                u[:,t] = self.u_bar[:,t] - eps*self.kappa[:,t] - self.K[:,:,t]@(z[:,t] - self.z_bar[:,t])
 
                 try:
-                    x[:,t+1] = self._calc_dynamics(x[:,t], u[:,t])
+                    z[:,t+1] = self._calc_dynamics(z[:,t], u[:,t])
                 except RuntimeError as e:
                     # If dynamics are infeasible, consider the loss to be infinite 
                     # and stop simulating. This will lead to a reduction in eps
@@ -359,27 +313,27 @@ class IterativeLinearQuadraticRegulator():
                     L = np.inf
                     break
 
-                L += (x[:,t]-self.x_nom).T@self.Q@(x[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
+                L += (z[:,t]-self.x_nom).T@self.Q@(z[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
                 expected_improvement += -eps*(1-eps/2)*self.dV_coeff[t]
-            L += (x[:,-1]-self.x_nom).T@self.Qf@(x[:,-1]-self.x_nom)
+            L += (z[:,-1]-self.x_nom).T@self.Qf@(z[:,-1]-self.x_nom)
 
             # Chech whether the improvement is sufficient
             improvement = L_last - L
             if improvement > self.gamma*expected_improvement:
-                return eps, x, u, L, n_iters
+                return eps, z, u, L, n_iters
 
             # Otherwise reduce eps by a factor of beta
             eps *= self.beta
 
         print(f"Warning: terminating linesearch after {n_iters} iterations")
-        return eps, x, u, L, n_iters
+        return eps, z, u, L, n_iters
     
     def _forward_pass(self, L_last):
         """
         Simulate the system forward in time using the local feedback
         control law
 
-            u = u_bar - eps*kappa - K*(x-x_bar).
+            u = u_bar - eps*kappa - K*(z-z_bar).
 
         Performs a linesearch on eps to (approximately) determine the 
         largest value in (0,1] that results in a reduced cost. 
@@ -389,8 +343,8 @@ class IterativeLinearQuadraticRegulator():
 
         Updates:
             u_bar:  The current best-guess of optimal u
-            x_bar:  The current best-guess of optimal x
-            fx:     Dynamics gradient w.r.t. x
+            z_bar:  The current best-guess of optimal z
+            fz:     Dynamics gradient w.r.t. z
             fu:     Dynamics gradient w.r.t. u
 
         Returns:
@@ -399,15 +353,15 @@ class IterativeLinearQuadraticRegulator():
             ls_iters:   Number of linesearch iterations
         """
         # Do linesearch to determine eps
-        eps, x, u, L, ls_iters = self._linesearch(L_last)
+        eps, z, u, L, ls_iters = self._linesearch(L_last)
 
         # Compute the first-order dynamics derivatives
         for t in range(0,self.N-1):
-            self.fx[:,:,t], self.fu[:,:,t] = self._calc_dynamics_partials(x[:,t], u[:,t])
+            self.fz[:,:,t], self.fu[:,:,t] = self._calc_dynamics_partials(z[:,t], u[:,t])
 
         # Update stored values
         self.u_bar = u
-        self.x_bar = x
+        self.z_bar = z
 
         return L, eps, ls_iters
     
@@ -418,7 +372,7 @@ class IterativeLinearQuadraticRegulator():
         approximation and a first-order approximation of the system 
         dynamics to compute the feedback controller
 
-            u = u_bar - eps*kappa - K*(x-x_bar).
+            u = u_bar - eps*kappa - K*(z-z_bar).
 
         Updates:
             kappa:      feedforward control term at each timestep
@@ -426,37 +380,36 @@ class IterativeLinearQuadraticRegulator():
             dV_coeff:   coefficients for expected change in cost
         """
         # Store gradient and hessian of cost-to-go
-        Vx, Vxx = self._terminal_cost_partials(self.x_bar[:,-1])
+        Vz, Vzz = self._terminal_cost_partials(self.z_bar[:,-1])
 
         # Do the backwards sweep
         for t in np.arange(self.N-2,-1,-1):
-            x = self.x_bar[:,t]
+            z = self.z_bar[:,t]
             u = self.u_bar[:,t]
 
             # Get second(/first) order approximation of cost(/dynamics)
-            lx, lu, lxx, luu, lux = self._running_cost_partials(x,u)
-            fx = self.fx[:,:,t]
+            lz, lu, lzz, luu, luz = self._running_cost_partials(z,u)
+            fz = self.fz[:,:,t]
             fu = self.fu[:,:,t]
 
             # Construct second-order approximation of cost-to-go
-            Qx = lx + fx.T@Vx
-            Qu = lu + fu.T@Vx
-            Qxx = lxx + fx.T@Vxx@fx
-            Quu = luu + fu.T@Vxx@fu
+            Qz = lz + fz.T@Vz
+            Qu = lu + fu.T@Vz
+            Qzz = lzz + fz.T@Vzz@fz
+            Quu = luu + fu.T@Vzz@fu
             Quu_inv = np.linalg.inv(Quu)
-            Qux = lux + fu.T@Vxx@fx
+            Quz = luz + fu.T@Vzz@fz
 
             # Derive controller parameters
             self.kappa[:,t] = Quu_inv@Qu
-            self.K[:,:,t] = Quu_inv@Qux
+            self.K[:,:,t] = Quu_inv@Quz
 
             # Derive cost reduction parameters
             self.dV_coeff[t] = Qu.T@Quu_inv@Qu
 
             # Update gradient and hessian of cost-to-go
-            Vx = Qx - Qu.T@Quu_inv@Qux
-            Vxx = Qxx - Qux.T@Quu_inv@Qux
-       
+            Vz = Qz - Qu.T@Quu_inv@Quz
+            Vzz = Qzz - Quz.T@Quu_inv@Quz
 
     def Solve(self):
         """
@@ -464,7 +417,8 @@ class IterativeLinearQuadraticRegulator():
         state and input trajectories. 
 
         Return:
-            x:              (n,N) numpy array containing optimal state trajectory
+            z:              (n,N) numpy array containing optimal state
+                             trajectory samples
             u:              (m,N-1) numpy array containing optimal control tape
             solve_time:     Total solve time in seconds
             optimal_cost:   Total cost associated with the (locally) optimal solution
@@ -496,15 +450,15 @@ class IterativeLinearQuadraticRegulator():
             L = L_new
             i += 1
 
-        return self.x_bar, self.u_bar, total_time, L
+        return self.z_bar, self.u_bar, total_time, L
 
     def SaveSolution(self, fname):
         """
-        Save the stored solution, including target state x_bar
+        Save the stored solution, including target state samples z_bar
         nominal control input u_bar, feedback gains K, and timesteps
         t in the given file, where the feedback control
 
-            u = u_bar - K*(x-x_bar)
+            u = u_bar - K*(z-z_bar)
 
         locally stabilizes the nominal trajectory.
 
@@ -515,28 +469,8 @@ class IterativeLinearQuadraticRegulator():
         T = (self.N-1)*dt
         t = np.arange(0,T,dt)
 
-        x_bar = self.x_bar[:,:-1]  # remove last timestep
+        z_bar = self.z_bar[:,:-1]  # remove last timestep
         u_bar = self.u_bar
         K = self.K
 
-        np.savez(fname, t=t, x_bar=x_bar, u_bar=u_bar, K=K)
-
-def CalcN(plant, context):
-    """
-    Helper to construct the map from generalized velocities to generalized
-    positions dot,
-
-        qdot = N(q) * v
-
-    where q is stored in the given context. 
-    """
-    nq = plant.num_positions()
-    nv = plant.num_velocities()
-    N = np.zeros((nq,nv))
-    for i in range(nv):
-        v = np.zeros(nv)
-        v[i] = 1.0
-        N[:,i] = plant.MapVelocityToQDot(context, v)
-
-    return N
-
+        np.savez(fname, t=t, z_bar=z_bar, u_bar=u_bar, K=K)

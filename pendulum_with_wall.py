@@ -9,6 +9,7 @@
 import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
+from mcilqr import MonteCarloIterativeLQR
 import time
 
 ####################################
@@ -132,13 +133,20 @@ plant_, scene_graph_ = create_system_model(builder_)
 builder_.ExportInput(plant_.get_actuation_input_port(),"control")
 system_ = builder_.Build()
 
+mc = True  # use monte-carlo/sotchastic version
+
 # Set up the optimizer
 num_steps = int(T/dt)
-ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-        autodiff=True)
+if mc:
+    ilqr = MonteCarloIterativeLQR(system_, num_steps, 1)
+else:
+    ilqr = IterativeLinearQuadraticRegulator(system_, num_steps)
 
 # Define initial and target states
-ilqr.SetInitialState(x0)
+if mc:
+    ilqr.SetInitialDistribution(x0,0.0*np.eye(2))
+else:
+    ilqr.SetInitialState(x0)
 ilqr.SetTargetState(x_nom)
 
 # Define cost function
