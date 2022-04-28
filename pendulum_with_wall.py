@@ -27,7 +27,7 @@ x0 = np.array([0.85*np.pi,0])
 x_nom = np.array([np.pi,0])
 
 # Quadratic cost int_{0^T} (x'Qx + u'Ru) + x_T*Qf*x_T
-Q = 0.1*np.diag([0,1])
+Q = 0.1*np.diag([1,1])
 R = 0.01*np.eye(1)
 Qf = 100*np.diag([1,1])
 
@@ -183,19 +183,20 @@ plt.subplot(3,1,3)
 plt.plot(timesteps[:-1],inputs.T)
 plt.ylabel("torque")
 plt.xlabel("time")
-plt.show()
+plt.show(block=False)
+plt.pause(0.01)
 
-if mc:
-    # If we did monte-carlo simulation, just take one of the
-    # state samples
-    i = 0
-    states = states[i*2:(i+1)*2,:]
-
+j = 0
 while True:
+
+    if mc:
+        # Choose which copy of the trajectory to play back
+        j = (j+1) % ns
+    
     # Just keep playing back the trajectory
     for i in range(len(timesteps)):
         t = timesteps[i]
-        x = states[:,i]
+        x = states[j*2:(j+1)*2,i]
 
         diagram_context.SetTime(t)
         plant.SetPositionsAndVelocities(plant_context, x)
