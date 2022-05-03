@@ -13,14 +13,6 @@ from mcilqr import MonteCarloIterativeLQR
 import time
 import matplotlib.pyplot as plt
 
-####################################
-# Parameters
-####################################
-
-####################################
-# Tools for system setup
-####################################
-
 def create_system_model(builder):
     """
     Create and return a plant and scene graph for the simple pendulum system.
@@ -97,11 +89,6 @@ def set_up_visualizer_system():
     plant, scene_graph = create_system_model(builder)
     assert plant.geometry_source_is_registered()
 
-    controller = builder.AddSystem(ConstantVectorSource(np.zeros(1)))
-    builder.Connect(
-            controller.get_output_port(),
-            plant.get_actuation_input_port())
-
     DrakeVisualizer().AddToBuilder(builder, scene_graph)
     ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
@@ -110,20 +97,39 @@ def set_up_visualizer_system():
     plant_context = diagram.GetMutableSubsystemContext(
             plant, diagram_context)
 
-    return diagram, diagram_context
+    return diagram, diagram_context, plant, plant_context
 
-def simulate(x0, u):
+def simulate_open_loop(x0, u):
     """
     Apply the given control sequence to the system from the
     given initial conditions. Shows the result on the visualizer.
     """
-    set_up_visualizer_system()
+    N = u.shape[1]
+    diagram, diagram_context, plant, plant_context = set_up_visualizer_system()
+
+    diagram_context.SetTime(0)
+    diagram_context.SetDiscreteState(x0)
+    plant.get_actuation_input_port().FixValue(plant_context, [0])
+    diagram.Publish(diagram_context)
+
+    t = 0
+    for i in range(N):
+        diagram_context.SetTime(t)
+        plant.get_actuation_input_port().FixValue(plant_context, u[:,i])
+
+        state = diagram_context.get_mutable_discrete_state()
+        diagram.CalcDiscreteVariableUpdates(diagram_context, state)
+        diagram.Publish(diagram_context)
+
+        t += dt
+        time.sleep(dt-3e-4)
 
 def playback_state_trajectories(states):
     """
     Play back the given set of state trajectories on the visualizer.
     """
-    diagram, diagram_context = set_up_visualizer_system()
+    diagram, diagram_context, plant, plant_context = set_up_visualizer_system()
+    plant.get_actuation_input_port().FixValue(plant_context, [0])
     ns = int(states.shape[0] / 2)  # number of state samples
 
     j = 0
@@ -146,10 +152,10 @@ def playback_state_trajectories(states):
             time.sleep(dt-3e-4)
         time.sleep(1)
 
-def solve_mc_ilqr(x0, x_nom, Q, R, ns):
+def solve_mc_ilqr(mu0, Sigma0, x_nom, Q, R, ns):
     """
     Solve the monte-carlo iLQR problem with the given
-    initial state, target state, cost matrices, and 
+    initial state distribution, target state, cost matrices, and 
     number of samples. 
     """
     # Create system model for the solver to use
@@ -163,9 +169,7 @@ def solve_mc_ilqr(x0, x_nom, Q, R, ns):
     ilqr = MonteCarloIterativeLQR(system_, num_steps, ns, seed=0)
 
     # Define initial and target states
-    mu = x0
-    Sigma = np.diag([0.05,0.0])
-    ilqr.SetInitialDistribution(mu,Sigma)
+    ilqr.SetInitialDistribution(mu0,Sigma0)
     ilqr.SetTargetState(x_nom)
 
     # Define cost function
@@ -216,11 +220,19 @@ if __name__=="__main__":
     Qf = np.diag([150,10])
 
     # Solve the iLQR problem
-    states, inputs, timesteps = solve_mc_ilqr(x0, x_nom, Q, R, ns=2)
+    mu0 = x0
+    Sigma0 = np.diag([0.05,0])
+    states, inputs, timesteps = solve_mc_ilqr(mu0, Sigma0, x_nom, Q, R, ns=2)
 
     # Make a plot of the optimal trajectories
     plot_state_and_control(states, inputs, timesteps, block=False)
 
     # Play back the state trajectories in sequence
-    playback_state_trajectories(states)
+    #playback_state_trajectories(states)
+
+    # Simulate optimal control from new initial conditions
+    while True:
+        x0 = np.random.multivariate_normal(mu0, Sigma0)
+        simulate_open_loop(x0, inputs)
+        time.sleep(1)
 
