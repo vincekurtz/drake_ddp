@@ -17,20 +17,6 @@ import matplotlib.pyplot as plt
 # Parameters
 ####################################
 
-T = 1.0         # total simulation time (S)
-dt = 1e-2       # simulation timestep
-
-# Initial state
-x0 = np.array([0.85*np.pi,0])
-
-# Target state
-x_nom = np.array([np.pi,0])
-
-# Quadratic cost int_{0^T} (x'Qx + u'Ru) + x_T*Qf*x_T
-Q = 0.1*np.diag([1,1])
-R = 0.01*np.eye(1)
-Qf = 100*np.diag([1,1])
-
 ####################################
 # Tools for system setup
 ####################################
@@ -103,104 +89,138 @@ def create_system_model(builder):
 
     return plant, scene_graph
 
-####################################
-# Create system diagram
-####################################
+def set_up_visualizer_system():
+    """
+    Set up a system model for use with the Drake visualizer.
+    """
+    builder = DiagramBuilder()
+    plant, scene_graph = create_system_model(builder)
+    assert plant.geometry_source_is_registered()
 
-builder = DiagramBuilder()
-plant, scene_graph = create_system_model(builder)
-assert plant.geometry_source_is_registered()
+    controller = builder.AddSystem(ConstantVectorSource(np.zeros(1)))
+    builder.Connect(
+            controller.get_output_port(),
+            plant.get_actuation_input_port())
 
-controller = builder.AddSystem(ConstantVectorSource(np.zeros(1)))
-builder.Connect(
-        controller.get_output_port(),
-        plant.get_actuation_input_port())
+    DrakeVisualizer().AddToBuilder(builder, scene_graph)
+    ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
-DrakeVisualizer().AddToBuilder(builder, scene_graph)
-ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+    diagram = builder.Build()
+    diagram_context = diagram.CreateDefaultContext()
+    plant_context = diagram.GetMutableSubsystemContext(
+            plant, diagram_context)
 
-diagram = builder.Build()
-diagram_context = diagram.CreateDefaultContext()
-plant_context = diagram.GetMutableSubsystemContext(
-        plant, diagram_context)
+    return diagram, diagram_context
 
-#####################################
-# Solve Trajectory Optimization
-#####################################
+def simulate(x0, u):
+    """
+    Apply the given control sequence to the system from the
+    given initial conditions. Shows the result on the visualizer.
+    """
+    set_up_visualizer_system()
 
-# Create system model for the solver to use
-builder_ = DiagramBuilder()
-plant_, scene_graph_ = create_system_model(builder_)
-builder_.ExportInput(plant_.get_actuation_input_port(),"control")
-system_ = builder_.Build()
+def playback_state_trajectories(states):
+    """
+    Play back the given set of state trajectories on the visualizer.
+    """
+    diagram, diagram_context = set_up_visualizer_system()
+    ns = int(states.shape[0] / 2)  # number of state samples
 
-mc = True  # use monte-carlo/stochastic version
-ns = 4     # number of monte-carlo samples to use
+    j = 0
+    while True:
+        # Choose which copy of the trajectory to play back
+        j = (j+1) % ns
+        
+        # Just keep playing back the trajectory
+        for i in range(len(timesteps)):
+            t = timesteps[i]
+            x = states[j*2:(j+1)*2,i]
 
-# Set up the optimizer
-num_steps = int(T/dt)
-if mc:
+            diagram_context.SetTime(t)
+            diagram_context.SetDiscreteState(x)
+            diagram.Publish(diagram_context)
+
+            if i==0:
+                # Wait a bit on first timestep to show initial state
+                time.sleep(0.5)
+            time.sleep(dt-3e-4)
+        time.sleep(1)
+
+def solve_mc_ilqr(x0, x_nom, Q, R, ns):
+    """
+    Solve the monte-carlo iLQR problem with the given
+    initial state, target state, cost matrices, and 
+    number of samples. 
+    """
+    # Create system model for the solver to use
+    builder_ = DiagramBuilder()
+    plant_, scene_graph_ = create_system_model(builder_)
+    builder_.ExportInput(plant_.get_actuation_input_port(),"control")
+    system_ = builder_.Build()
+
+    # Set up the optimizer
+    num_steps = int(T/dt)
     ilqr = MonteCarloIterativeLQR(system_, num_steps, ns, seed=0)
-else:
-    ilqr = IterativeLinearQuadraticRegulator(system_, num_steps)
 
-# Define initial and target states
-if mc:
+    # Define initial and target states
     mu = x0
     Sigma = np.diag([0.05,0.0])
     ilqr.SetInitialDistribution(mu,Sigma)
-else:
-    ilqr.SetInitialState(x0)
-ilqr.SetTargetState(x_nom)
+    ilqr.SetTargetState(x_nom)
 
-# Define cost function
-ilqr.SetRunningCost(dt*Q, dt*R)
-ilqr.SetTerminalCost(Qf)
+    # Define cost function
+    ilqr.SetRunningCost(dt*Q, dt*R)
+    ilqr.SetTerminalCost(Qf)
 
-# Set initial guess
-u_guess = np.zeros((1,num_steps-1))
-ilqr.SetInitialGuess(u_guess)
+    # Set initial guess
+    u_guess = np.zeros((1,num_steps-1))
+    ilqr.SetInitialGuess(u_guess)
 
-states, inputs, solve_time, optimal_cost = ilqr.Solve()
-print(f"Solved in {solve_time} seconds using iLQR")
-print(f"Optimal cost: {optimal_cost}")
-timesteps = np.arange(0.0,T,dt)
+    states, inputs, solve_time, optimal_cost = ilqr.Solve()
+    print(f"Solved in {solve_time} seconds using iLQR")
+    print(f"Optimal cost: {optimal_cost}")
+    timesteps = np.arange(0.0,T,dt)
 
-#####################################
-# Playback
-#####################################
+    return states, inputs, timesteps
 
-# Make some plot of the state trajectories
-plt.subplot(3,1,1)
-thetas = states[0::2,:]
-theta_dots = states[1::2,:]
-plt.plot(timesteps,thetas.T)
-plt.ylabel("theta")
-plt.subplot(3,1,2)
-plt.plot(timesteps,theta_dots.T)
-plt.ylabel("theta_dot")
-plt.subplot(3,1,3)
-plt.plot(timesteps[:-1],inputs.T)
-plt.ylabel("torque")
-plt.xlabel("time")
-plt.show(block=False)
-plt.pause(0.01)
+def plot_state_and_control(states, inputs, timesteps, block=True):
+    """
+    Make a quick plot of the (sampled) state and input trajectories.
+    """
+    # Make some plot of the state trajectories
+    plt.subplot(3,1,1)
+    thetas = states[0::2,:]
+    theta_dots = states[1::2,:]
+    plt.plot(timesteps,thetas.T)
+    plt.ylabel("theta")
+    plt.subplot(3,1,2)
+    plt.plot(timesteps,theta_dots.T)
+    plt.ylabel("theta_dot")
+    plt.subplot(3,1,3)
+    plt.plot(timesteps[:-1],inputs.T)
+    plt.ylabel("torque")
+    plt.xlabel("time")
+    plt.show(block=block)
+    plt.pause(0.01)
 
-j = 0
-while True:
+if __name__=="__main__":
+    # Set parameters
+    T = 1.0         # total simulation time (S)
+    dt = 1e-2       # simulation timestep
 
-    if mc:
-        # Choose which copy of the trajectory to play back
-        j = (j+1) % ns
-    
-    # Just keep playing back the trajectory
-    for i in range(len(timesteps)):
-        t = timesteps[i]
-        x = states[j*2:(j+1)*2,i]
+    x0 = np.array([0.8*np.pi,0])  # initial state
+    x_nom = np.array([np.pi,0])   # target state
 
-        diagram_context.SetTime(t)
-        plant.SetPositionsAndVelocities(plant_context, x)
-        diagram.Publish(diagram_context)
+    Q = np.diag([100,10])   # Quadratic cost
+    R = 0.01*np.eye(1)      # int_{0^T} (x'Qx + u'Ru) + x_T*Qf*x_T
+    Qf = np.diag([150,10])
 
-        time.sleep(dt-3e-4)
-    time.sleep(1)
+    # Solve the iLQR problem
+    states, inputs, timesteps = solve_mc_ilqr(x0, x_nom, Q, R, ns=2)
+
+    # Make a plot of the optimal trajectories
+    plot_state_and_control(states, inputs, timesteps, block=False)
+
+    # Play back the state trajectories in sequence
+    playback_state_trajectories(states)
+
