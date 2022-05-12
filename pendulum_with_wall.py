@@ -13,7 +13,7 @@ from mcilqr import MonteCarloIterativeLQR
 import time
 import matplotlib.pyplot as plt
 
-def create_system_model(builder):
+def create_system_model(builder, collision=True, opacity=1.0):
     """
     Create and return a plant and scene graph for the simple pendulum system.
     """
@@ -41,10 +41,11 @@ def create_system_model(builder):
     rod_props = ProximityProperties()
     AddCompliantHydroelasticProperties(radius, 5e6, rod_props)
     AddContactMaterial(friction=CoulombFriction(0.5,0.5), properties=rod_props)
-    plant.RegisterCollisionGeometry(rod, RigidTransform(), rod_shape,
-            "rod_collision", rod_props)
+    if collision:
+        plant.RegisterCollisionGeometry(rod, RigidTransform(), rod_shape,
+                "rod_collision", rod_props)
     plant.RegisterVisualGeometry(rod, RigidTransform(), rod_shape, "rod_visual", 
-            [0.5,0.5,0.9,1.0])
+            [0.5,0.5,0.9,opacity])
 
     # Add a sphere on the end of the pendulum
     ball_shape = Sphere(2*radius)
@@ -56,10 +57,11 @@ def create_system_model(builder):
     ball_props = ProximityProperties()
     AddCompliantHydroelasticProperties(2*radius, 5e6, ball_props)
     AddContactMaterial(friction=CoulombFriction(0.5,0.5), properties=ball_props)
-    plant.RegisterCollisionGeometry(ball, RigidTransform(), ball_shape,
-            "ball_collision", ball_props)
+    if collision:
+        plant.RegisterCollisionGeometry(ball, RigidTransform(), ball_shape,
+                "ball_collision", ball_props)
     plant.RegisterVisualGeometry(ball, RigidTransform(), ball_shape,
-            "ball_visual", [0.5,0.5,0.9,1.0])
+            "ball_visual", [0.5,0.5,0.9,opacity])
 
     # Add a box to collide with
     box = plant.AddModelInstance("box")
@@ -72,10 +74,11 @@ def create_system_model(builder):
     box_props = ProximityProperties()
     AddCompliantHydroelasticProperties(1.0, 5e6, box_props)
     AddContactMaterial(dissipation=1, friction=CoulombFriction(0.5,0.5), properties=box_props)
-    plant.RegisterCollisionGeometry(box_body, RigidTransform(), box_shape,
-            "box_collision", box_props)
+    if collision:
+        plant.RegisterCollisionGeometry(box_body, RigidTransform(), box_shape,
+                "box_collision", box_props)
     plant.RegisterVisualGeometry(box_body, RigidTransform(), box_shape, 
-            "box_visual", [0.5,0.9,0.5,1.0])
+            "box_visual", [0.5,0.9,0.5,opacity])
 
     plant.Finalize()
 
@@ -83,11 +86,13 @@ def create_system_model(builder):
 
 def set_up_visualizer_system():
     """
-    Set up a system model for use with the Drake visualizer.
+    Set up a system model for use with the visualizer.
     """
     builder = DiagramBuilder()
     plant, scene_graph = create_system_model(builder)
     assert plant.geometry_source_is_registered()
+
+    #meshcat = ConnectMeshcatVisualizer(builder, scene_graph)
 
     DrakeVisualizer().AddToBuilder(builder, scene_graph)
     ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
@@ -98,6 +103,26 @@ def set_up_visualizer_system():
             plant, diagram_context)
 
     return diagram, diagram_context, plant, plant_context
+
+def set_up_dummy_visualizer_system(num_copies):
+    """
+    Set up a system model for visualizing many copies of
+    the system at once. 
+    """
+    builder = DiagramBuilder()
+    for i in range(num_copies):
+        plant, scene_graph = create_system_model(builder, collision=False,
+                opacity=0.5)
+        plant.set_name(f"plant_{i}")
+        scene_graph.set_name(f"scene_graph_{i}")
+    
+    DrakeVisualizer().AddToBuilder(builder, scene_graph)
+    ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+
+    diagram = builder.Build()
+    diagram_context = diagram.CreateDefaultContext()
+
+    return diagram, diagram_context
 
 def simulate_open_loop(x0, u):
     """
@@ -124,27 +149,44 @@ def simulate_open_loop(x0, u):
         t += dt
         time.sleep(dt-3e-4)
 
-def playback_state_trajectories(states):
+def playback_state_trajectories(states, timesteps):
     """
     Play back the given set of state trajectories on the visualizer.
     """
-    diagram, diagram_context, plant, plant_context = set_up_visualizer_system()
-    plant.get_actuation_input_port().FixValue(plant_context, [0])
-    ns = int(states.shape[0] / 2)  # number of state samples
+    # Get number of different state trajectories
+    ns = int(states.shape[0] / 2)
+
+    # Set up a system for visualizing all the state trajectories
+    diagram, context = set_up_dummy_visualizer_system(ns)
+
+    plt.figure()
+    plot_system_graphviz(diagram, max_depth=1)
+    plt.show()
+
+    sys.exit()
+    #diagrams = []
+    #contexts = []
+    #for i in range(ns):
+    #    diagram, diagram_context, plant, plant_context = set_up_visualizer_system()
+    #    plant.get_actuation_input_port().FixValue(plant_context, [0])
+
+    #    diagrams.append(diagram)
+    #    contexts.append(diagram_context)
 
     j = 0
     while True:
         # Choose which copy of the trajectory to play back
-        j = (j+1) % ns
+        #j = (j+1) % ns
         
         # Just keep playing back the trajectory
         for i in range(len(timesteps)):
-            t = timesteps[i]
-            x = states[j*2:(j+1)*2,i]
+            for j in range(ns):
+                t = timesteps[i]
+                x = states[j*2:(j+1)*2,i]
 
-            diagram_context.SetTime(t)
-            diagram_context.SetDiscreteState(x)
-            diagram.Publish(diagram_context)
+                contexts[j].SetTime(t)
+                contexts[j].SetDiscreteState(x)
+                diagrams[j].Publish(contexts[j])
 
             if i==0:
                 # Wait a bit on first timestep to show initial state
@@ -228,11 +270,11 @@ if __name__=="__main__":
     plot_state_and_control(states, inputs, timesteps, block=False)
 
     # Play back the state trajectories in sequence
-    #playback_state_trajectories(states)
+    playback_state_trajectories(states, timesteps)
 
     # Simulate optimal control from new initial conditions
-    while True:
-        x0 = np.random.multivariate_normal(mu0, Sigma0)
-        simulate_open_loop(x0, inputs)
-        time.sleep(1)
+    #while True:
+    #    x0 = np.random.multivariate_normal(mu0, Sigma0)
+    #    simulate_open_loop(x0, inputs)
+    #    time.sleep(1)
 

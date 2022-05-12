@@ -83,8 +83,8 @@ system_ = builder_.Build()
 if method == "ilqr":
     # Set up the optimizer
     num_steps = int(T/dt)
-    ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-            beta=0.9, autodiff=False)
+    ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, delta=1e-3,
+            beta=0.9, autodiff=True)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)

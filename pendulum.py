@@ -9,6 +9,7 @@
 import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
+from pontryagin import PontryaginOptimizer
 import time
 
 ####################################
@@ -19,8 +20,8 @@ T = 1.0         # total simulation time (S)
 dt = 1e-2      # simulation timestep
 
 # Solver method
-# must be "ilqr" or "sqp"
-method = "ilqr"
+# must be "ilqr" or "sqp" or "pontryagin"
+method = "pontryagin"
 
 # Initial state
 x0 = np.array([0,0])
@@ -106,6 +107,32 @@ if method == "ilqr":
     timesteps = np.arange(0.0,T,dt)
 
 #-----------------------------------------
+# Pontryagin method (experimental)
+#-----------------------------------------
+
+if method == "pontryagin":
+    # Set up the optimizer
+    num_steps = int(T/dt)
+    popt = PontryaginOptimizer(system_, num_steps)
+
+    # Define initial and target states
+    popt.SetInitialState(x0)
+    popt.SetTargetState(x_nom)
+
+    # Define cost function
+    popt.SetRunningCost(dt*Q, dt*R)
+    popt.SetTerminalCost(Qf)
+
+    # Set initial guess
+    u_guess = np.zeros((1,num_steps-1))
+    popt.SetInitialGuess(u_guess)
+
+    states, inputs, solve_time, optimal_cost = popt.Solve()
+    print(f"Solved in {solve_time} seconds using special Pontryagin method")
+    print(f"Optimal cost: {optimal_cost}")
+    timesteps = np.arange(0.0,T,dt)
+
+#-----------------------------------------
 # Direct Transcription method
 #-----------------------------------------
 
@@ -131,6 +158,8 @@ elif method == "sqp":
     
     # Solve the optimization problem
     st = time.time()
+    prog = trajopt.prog()
+    prog.SetSolverOption(SolverType.kSnopt, "Print file", "/tmp/snopt.out")
     res = Solve(trajopt.prog())
     solve_time = time.time() - st
     assert res.is_success(), "trajectory optimizer failed"
