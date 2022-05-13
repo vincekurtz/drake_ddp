@@ -61,16 +61,14 @@ class PontryaginOptimizer():
         self.R = np.eye(self.m)
         self.Qf = np.eye(self.n)
 
-        # Arrays to store best guess of control and state trajectory
-        self.x_bar = np.zeros((self.n,self.N))
-        self.u_bar = np.zeros((self.m,self.N-1))
-
+        # Arrays to store current state, costate, and control extimates
+        self.x = np.zeros((self.n,self.N))
+        self.costate = np.zeros((self.n, self.N))
+        self.u = np.zeros((self.m,self.N-1))
+        
         # Arrays to store dynamics gradients
         self.fx = np.zeros((self.n,self.n,self.N-1))
         self.fu = np.zeros((self.n,self.m,self.N-1))
-
-        # Array to store (best buess of) costate trajectory
-        self.costate = np.zeros((self.n, self.N))
 
     def SetInitialState(self, x0):
         """
@@ -118,15 +116,49 @@ class PontryaginOptimizer():
         assert Qf.shape == (self.n, self.n)
         self.Qf = Qf
     
-    def SetInitialGuess(self, u_guess):
+    def SetInitialGuess(self, x_guess, u_guess, lambda_guess):
         """
-        Set the initial guess of control tape.
+        Set the initial guess of state, control, and costate.
 
         Args:
-            u_guess:    (m,N-1) numpy array containing u at each timestep
+            x_guess:      (n,N) numpy array containing x at each timestep
+            u_guess:      (m,N-1) numpy array containing u at each timestep
+            lambda_guess: (n,N)
         """
         assert u_guess.shape == (self.m, self.N-1)
-        self.u_bar = u_guess
+        assert x_guess.shape == (self.n, self.N)
+        assert lambda_guess.shape == (self.n, self.N)
+
+        self.u = u_guess
+        self.x = x_guess
+        self.costate = lambda_guess  
+
+        # TODO: consider setting costate guess from backwards pass
+
+    def _calc_total_cost(self):
+        """
+        Compute the total cost associated with the current guess.
+        """
+        L = 0
+        for t in range(self.N-1):
+            x_err = self.x[:,t] - self.x_nom
+            u = self.u[:,t]
+            L += x_err.T@self.Q@x_err + u.T@self.R@u
+
+        x_err = self.x[:,-1] - self.x_nom
+        L += x_err.T@self.Qf@x_err
+
+        return L
+
+    def _calc_feasibility_gap(self):
+        """
+        Compute a measure of the dynamics error
+
+            x_{t+1} - f(x_t, u_t)
+
+        for the current guess. 
+        """
+        return np.inf
 
     def _running_cost_partials(self, x, u):
         """
@@ -228,89 +260,124 @@ class PontryaginOptimizer():
         fx = G[:,:self.n]
         fu = G[:,self.n:]
 
-        # Return exact value
-        x_next = ExtractValue(x_next).flatten()
+        return fx, fu
 
-        return x_next, fx, fu
-
-    def _forward_pass(self):
+    def _calc_g(self):
         """
-        Simulate the system forward in time.
+        Compute the value of the constraint function
 
-        Updates:
-            u_bar:  The current best-guess of optimal u
-            x_bar:  The current best-guess of optimal x
-            fx:     Dynamics gradient w.r.t. x
-            fu:     Dynamics gradient w.r.t. u
+            g(x,u,lambda) = 0
 
-        Returns:
-            L:          Total cost associated with this pass
+        which contains the PMP optimality conditions.
         """
-        L = 0
-        x = np.zeros((self.n,self.N))
-        u = np.zeros((self.m,self.N-1))
+        n = self.n
+        m = self.m
+        N = self.N
+        g = np.zeros(2*N*n + (N-1)*m)
 
-        x[:,0] = self.x0
-        for t in range(0,self.N-1):
-            # Update control input
-            u[:,t] = self.u_bar[:,t]
+        # Initial condition x0 = x_init
+        g[0:n] = self.x[:,0] - self.x0
 
-            # Compute next state and dynamics derivatives
-            x[:,t+1], self.fx[:,:,t], self.fu[:,:,t] = \
-                    self._calc_dynamics_partials(x[:,t], u[:,t])
-            
-            # Update the current cost
-            L += (x[:,t]-self.x_nom).T@self.Q@(x[:,t]-self.x_nom) + u[:,t].T@self.R@u[:,t]
-        L += (x[:,-1]-self.x_nom).T@self.Qf@(x[:,-1]-self.x_nom)
+        # Terminal costate condition lambda_T = lf_x(x_T)
+        lf_x, _ = self._terminal_cost_partials(self.x[:,-1])
+        g[n:2*n] = lf_x
 
-        # Update stored values
-        self.u_bar = u
-        self.x_bar = x
+        # State dynamics x_{t+1} = f(x_t, u_t)
+        for t in range(N-1):
+            x_next = self.x[:,t+1]
+            x_pred = self._calc_dynamics(self.x[:,t], self.u[:,t])
+            g[(2+t)*n:(2+t+1)*n] = x_next - x_pred
 
-        return L
-    
-    def _backward_pass(self):
-        """
-        Update the estimated costate trajectory by simuating backwards
-        in time, where
-
-            lambda_t = l_x + f_x^T lambda_{t+1}
-            lambda_T = lf_x
-
-        Updates:
-            costate:    the costate (lambda) trajectory
-        """
-        # Gradient of terminal cost is final costate value
-        lf_x, lf_xx = self._terminal_cost_partials(self.x_bar[:,-1])
-        self.costate[:,-1] = lf_x
-
-        # Do the backwards sweep
-        for t in np.arange(self.N-2,-1,-1):
-            lx, lu, lxx, luu, lux = \
-                self._running_cost_partials(self.x_bar[:,t], self.u_bar[:,t])
+        # Costate dynamics lambda_t = lx + fx'*lambda_{t+1}
+        for t in range(N-1):
+            lx, _,_,_,_ = self._running_cost_partials(self.x[:,t], self.u[:,t])
             fx = self.fx[:,:,t]
 
-            self.costate[:,t] = lx + fx.T@self.costate[:,t+1]
+            lmbda = self.costate[:,t]
+            lmbda_pred = lx + fx.T@self.costate[:,t+1]
 
-    def _update_control(self):
-        """
-        Update the best guess of the optimal control based on the 
-        latest costate estimate:
+            g[(2+N-1+t)*n:(2+N+t)*n] = lmbda - lmbda_pred
 
-            ubar_t = argmin_u H(x_t, u, lambda_{t+1})
-
-        Updates:    
-            u_bar:  The current control input guess
-        """
-        for t in range(self.N-1):
+        # Optimal control conditions lu + fu'*lambda_{t+1} = 0
+        start_idx = (2+2*(N-1))*n
+        for t in range(N-1):
+            _, lu, _,_,_ = self._running_cost_partials(self.x[:,t], self.u[:,t])
+            fu = self.fu[:,:,t]
             lmbda = self.costate[:,t+1]
+
+            g[start_idx+t*m:start_idx+(t+1)*m] = lu + fu.T@lmbda
+
+        return g
+
+    def _calc_grad_g(self):
+        """
+        Compute the gradient of the constraint function
+
+            g(x,u,lambda),
+
+        where g=0 enforces the PMP optimality conditions.
+        """
+        n = self.n
+        m = self.m
+        N = self.N
+        size = 2*N*n + (N-1)*m  # number of variables and constraints
+        grad = np.full((size, size), np.nan)
+
+        # Initial condition x0 = x_init
+        row_start = 0
+        row_end = n
+
+        grad[row_start:row_end,0:n] = np.eye(n)
+        
+        # Terminal costate condition lambda_T = lf_x(x_T)
+        row_start = n
+        row_end = 2*n
+
+        _, lf_xx = self._terminal_cost_partials(self.x[:,-1])
+        grad[row_start:row_end, 2*n:3*n] = -lf_xx
+
+        grad[row_start:row_end, (2*N-1)*n:2*N*n] = np.eye(n)
+        
+        # State dynamics x_{t+1} = f(x_t, u_t)
+        for t in range(N-1):
+            row_start = (2+t)*n
+            row_end = (2+t+1)*n
+
+            fx = self.fx[:,:,t]
             fu = self.fu[:,:,t]
 
-            u_star = -1/2 * np.linalg.inv(self.R) @ fu.T @ lmbda
+            grad[row_start:row_end, t*n:(t+1)*n] = -fx
+            grad[row_start:row_end, (t+1)*n:(t+2)*n] = np.eye(n)
 
-            # Just move slightly in the direction of the new optimum
-            alpha = 1e-5
-            self.u_bar[:,t] = alpha*u_star + (1-alpha)*self.u_bar[:,t]
+            col_start = (2+2*(N-1))*n+t*m
+            col_end = (2+2*(N-1))*n+(t+1)*m
+            grad[row_start:row_end, col_start:col_end] = -fu
+
+        # Costate dynamics lambda_t = lx + fx'*lambda_{t+1}
+        for t in range(N-1):
+            row_start = (2+N-1+t)*n
+            row_end = (2+N+t)*n
+
+            _,_, lxx, _,_ = self._running_cost_partials(self.x[:,t],self.u[:,t])
+            fx = self.fx[:,:,t]
+
+            grad[row_start:row_end, t*n:(t+1)*n] = -lxx
+            grad[row_start:row_end, (N+t)*n:(N+t+1)*n] = np.eye(n)
+            grad[row_start:row_end, (N+t+1)*n:(N+t+2)*n] = -fx.T
+        
+        # Optimal control conditions lu + fu'*lambda_{t+1} = 0
+        for t in range(N-1):
+            row_start = (2+2*(N-1))*n+t*m
+            row_end = (2+2*(N-1))*n+(t+1)*m
+
+            _,_,_, luu ,_ = self._running_cost_partials(self.x[:,t],self.u[:,t])
+            fu = self.fu[:,:,t]
+
+            grad[row_start:row_end, (N+1+t)*n: (N+1+t+1)*n] = fu.T
+            grad[row_start:row_end, row_start:row_end] = luu
+
+        np.set_printoptions(precision=1, suppress=True, linewidth=200)
+        print(grad)
 
     def Solve(self):
         """
@@ -323,40 +390,43 @@ class PontryaginOptimizer():
             solve_time:     Total solve time in seconds
             optimal_cost:   Total cost associated with the (locally) optimal solution
         """
-        # Store total cost and improvement in cost
-        L = np.inf
-        improvement = np.inf
-
         # Print labels for debug info
         print("---------------------------------------------------------------------------------")
-        print("|    iter    |    cost    |    eps    |    ls    |    iter time    |    time    |")
+        print("|    iter    |    cost    |    gap    |    __    |    iter time    |    time    |")
         print("---------------------------------------------------------------------------------")
 
         # iteration counter
         i = 1
         st = time.time()
-        while i < 100:
+        while i <= 2:
             st_iter = time.time()
 
-            # Forward simulation to define state trajectory
-            L_new = self._forward_pass()
-            eps = np.inf      # DEBUG
-            ls_iters = np.inf
+            # Update all dynamics gradients
+            for t in range(self.N-1):
+                self.fx[:,:,t], self.fu[:,:,t] = \
+                        self._calc_dynamics_partials(self.x[:,t], self.u[:,t])
 
-            # Backward pass to define costate trajectory
-            self._backward_pass()
+            # Construct g(Y) and \grad g(Y)
+            g = self._calc_g()
+            grad = self._calc_grad_g()
 
-            # Update control inputs
-            self._update_control()
+            # Solve the newton system
+
+            # Linesearch (?)
+
+            # Update Y = [x, u, lambda]
+
+            # Compute some stats
+            L = self._calc_total_cost()
+            gap = self._calc_feasibility_gap()
+            placeholder = np.inf
 
             iter_time = time.time() - st_iter
             total_time = time.time() - st
 
-            print(f"{i:^14}{L_new:11.4f}  {eps:^12.4f}{ls_iters:^11}     {iter_time:1.5f}          {total_time:4.2f}")
+            print(f"{i:^14}{L:11.4f}  {gap:^12.4f}{placeholder:^11}     {iter_time:1.5f}          {total_time:4.2f}")
 
-            improvement = L - L_new
-            L = L_new
             i += 1
 
-        return self.x_bar, self.u_bar, total_time, L
+        return self.x, self.u, total_time, L
 

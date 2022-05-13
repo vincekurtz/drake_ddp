@@ -16,7 +16,7 @@ import time
 # Parameters
 ####################################
 
-T = 1.0         # total simulation time (S)
+T = 3e-2         # total simulation time (S)
 dt = 1e-2      # simulation timestep
 
 # Solver method
@@ -24,7 +24,7 @@ dt = 1e-2      # simulation timestep
 method = "pontryagin"
 
 # Initial state
-x0 = np.array([0,0])
+x0 = np.array([0.1,0.01])
 
 # Target state
 x_nom = np.array([np.pi,0])
@@ -125,7 +125,9 @@ if method == "pontryagin":
 
     # Set initial guess
     u_guess = np.zeros((1,num_steps-1))
-    popt.SetInitialGuess(u_guess)
+    x_guess = np.zeros((2,num_steps)) + 0.2
+    lambda_guess = np.zeros((2,num_steps))  # costate
+    popt.SetInitialGuess(x_guess, u_guess, lambda_guess)
 
     states, inputs, solve_time, optimal_cost = popt.Solve()
     print(f"Solved in {solve_time} seconds using special Pontryagin method")
