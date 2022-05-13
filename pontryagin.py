@@ -321,7 +321,7 @@ class PontryaginOptimizer():
         m = self.m
         N = self.N
         size = 2*N*n + (N-1)*m  # number of variables and constraints
-        grad = np.full((size, size), np.nan)
+        grad = np.full((size, size), 0.0)
 
         # Initial condition x0 = x_init
         row_start = 0
@@ -376,8 +376,7 @@ class PontryaginOptimizer():
             grad[row_start:row_end, (N+1+t)*n: (N+1+t+1)*n] = fu.T
             grad[row_start:row_end, row_start:row_end] = luu
 
-        np.set_printoptions(precision=1, suppress=True, linewidth=200)
-        print(grad)
+        return grad
 
     def Solve(self):
         """
@@ -398,7 +397,7 @@ class PontryaginOptimizer():
         # iteration counter
         i = 1
         st = time.time()
-        while i <= 2:
+        while i <= 10:
             st_iter = time.time()
 
             # Update all dynamics gradients
@@ -411,10 +410,22 @@ class PontryaginOptimizer():
             grad = self._calc_grad_g()
 
             # Solve the newton system
+            delta_Y = np.linalg.solve(grad, -g)
 
             # Linesearch (?)
+            alpha = 0.00001
 
             # Update Y = [x, u, lambda]
+            Y = np.hstack([
+                    self.x.flatten(), 
+                    self.costate.flatten(),
+                    self.u.flatten()])
+           
+            Y += alpha * delta_Y
+
+            self.x = Y[0:self.N*self.n].reshape(self.N,self.n).T
+            self.costate = Y[self.N*self.n:2*self.N*self.n].reshape(self.N,self.n).T
+            self.u = Y[2*self.N*self.n:].reshape(self.N-1,self.m).T
 
             # Compute some stats
             L = self._calc_total_cost()

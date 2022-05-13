@@ -16,7 +16,7 @@ import time
 # Parameters
 ####################################
 
-T = 3e-2         # total simulation time (S)
+T = 1.0        # total simulation time (S)
 dt = 1e-2      # simulation timestep
 
 # Solver method
@@ -24,7 +24,7 @@ dt = 1e-2      # simulation timestep
 method = "pontryagin"
 
 # Initial state
-x0 = np.array([0.1,0.01])
+x0 = np.array([0.0,0.0])
 
 # Target state
 x_nom = np.array([np.pi,0])
@@ -110,7 +110,7 @@ if method == "ilqr":
 # Pontryagin method (experimental)
 #-----------------------------------------
 
-if method == "pontryagin":
+elif method == "pontryagin":
     # Set up the optimizer
     num_steps = int(T/dt)
     popt = PontryaginOptimizer(system_, num_steps)
@@ -125,7 +125,7 @@ if method == "pontryagin":
 
     # Set initial guess
     u_guess = np.zeros((1,num_steps-1))
-    x_guess = np.zeros((2,num_steps)) + 0.2
+    x_guess = np.zeros((2,num_steps))
     lambda_guess = np.zeros((2,num_steps))  # costate
     popt.SetInitialGuess(x_guess, u_guess, lambda_guess)
 
