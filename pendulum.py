@@ -24,10 +24,10 @@ dt = 1e-2      # simulation timestep
 method = "pontryagin"
 
 # Initial state
-x0 = np.array([0.0,0.0])
+x0 = np.array([0.0,0.1])
 
 # Target state
-x_nom = np.array([np.pi,0])
+x_nom = np.array([0.5,0])
 
 # Quadratic cost int_{0^T} (x'Qx + u'Ru) + x_T*Qf*x_T
 Q = 0.01*np.diag([0,1])
@@ -38,12 +38,45 @@ Qf = 100*np.diag([1,1])
 # Tools for system setup
 ####################################
 
-def create_system_model(plant):
-    urdf = FindResourceOrThrow("drake/examples/pendulum/Pendulum.urdf")
-    robot = Parser(plant=plant).AddModelFromFile(urdf)
+def create_system_model(builder, dt):
+    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
+
+    mass = 1.0
+    radius = 0.01
+    length = 0.5
+    damping = 0.0
+
+    # Create the pendulum object
+    pendulum = plant.AddModelInstance("pendulum")
+    rod = plant.AddRigidBody("rod", pendulum, SpatialInertia(mass, [0,0,0],
+                UnitInertia.SolidCylinder(radius, length)))
+    rod_com_frame = plant.GetFrameByName("rod")
+    X_base_com = RigidTransform(RotationMatrix(),[0,0,length/2])
+    rod_base_frame = plant.AddFrame(FixedOffsetFrame("rod_base",
+        rod_com_frame, X_base_com))
+    #base_joint = plant.AddJoint(RevoluteJoint("base_joint", plant.world_frame(),
+    #    rod_base_frame, [1,0,0], damping))
+    base_joint = plant.AddJoint(PrismaticJoint("base_joint", plant.world_frame(),
+        rod_base_frame, [1,0,0], damping))
+    plant.AddJointActuator("base_actuator", base_joint)
+    rod_shape = Cylinder(radius, length)
+    plant.RegisterVisualGeometry(rod, RigidTransform(), rod_shape, "rod_visual", 
+            [0.5,0.5,0.9,1])
+
+    # Add a sphere on the end of the pendulum
+    ball_shape = Sphere(2*radius)
+    ball = plant.AddRigidBody("ball", pendulum, SpatialInertia(mass, [0,0,0],
+                UnitInertia.SolidSphere(2*radius)))
+    X_ball = RigidTransform(RotationMatrix(),[0,0,-length/2])
+    plant.WeldFrames(plant.GetFrameByName("rod"), plant.GetFrameByName("ball"),
+            X_ball)
+    plant.RegisterVisualGeometry(ball, RigidTransform(), ball_shape,
+            "ball_visual", [0.5,0.5,0.9,1])
+
     plant.Finalize()
     plant.set_name("plant")
-    return plant
+
+    return plant, scene_graph
 
 ####################################
 # Create system diagram
@@ -51,8 +84,7 @@ def create_system_model(plant):
 
 builder = DiagramBuilder()
 
-plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
-plant = create_system_model(plant)
+plant, scene_graph = create_system_model(builder, dt)
 assert plant.geometry_source_is_registered()
 
 controller = builder.AddSystem(ConstantVectorSource(np.zeros(1)))
@@ -74,8 +106,7 @@ plant_context = diagram.GetMutableSubsystemContext(
 
 # Create system model for the solver to use
 builder_ = DiagramBuilder()
-plant_ = builder_.AddSystem(MultibodyPlant(dt))
-plant_ = create_system_model(plant_)
+plant_, scene_graph_ = create_system_model(builder_, dt)
 builder_.ExportInput(plant_.get_actuation_input_port(),"control")
 system_ = builder_.Build()
 
