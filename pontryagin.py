@@ -39,12 +39,6 @@ class PontryaginOptimizer():
         self.context_ad = self.system_ad.CreateDefaultContext()
         self.input_port_ad = self.system_ad.get_input_port(input_port_index)
         
-        # Extract the MultibodyPlant model from the given system. 
-        # The system in this case must include a MultibodyPlant called "plant"
-        # which is attached to a corresponding scene graph (for geometry computations)
-        self.plant = self.system.GetSubsystemByName("plant")
-        self.plant_context = self.system.GetMutableSubsystemContext(self.plant, self.context)
-           
         # Set some parameters
         self.N = num_timesteps
 
@@ -280,7 +274,7 @@ class PontryaginOptimizer():
 
         # Terminal costate condition lambda_T = lf_x(x_T)
         lf_x, _ = self._terminal_cost_partials(self.x[:,-1])
-        g[n:2*n] = lf_x
+        g[n:2*n] = self.costate[:,-1] - lf_x
 
         # State dynamics x_{t+1} = f(x_t, u_t)
         for t in range(N-1):

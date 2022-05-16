@@ -8,6 +8,7 @@
 
 from pydrake.all import *
 import numpy as np
+import time
 
 def solve_QP(A, B, Q, R, Qf, x_init, T):
     """
@@ -45,7 +46,10 @@ def solve_QP(A, B, Q, R, Qf, x_init, T):
     mp.AddCost( x[:,-1].T@Qf@x[:,t] )
 
     # Solve the optimization problem and extract the solution
+    st = time.time()
     res = Solve(mp)
+    solve_time = time.time()-st
+    print("Solve time:", solve_time)
     print("Solved QP with", res.get_solver_id().name())
     x = res.GetSolution(x)
 
@@ -91,7 +95,10 @@ def solve_PMP(A, B, Q, R, Qf, x_init, T):
     ))
 
     # Solve the optimization problem and extract the solution
+    st = time.time()
     res = Solve(mp)
+    solve_time = time.time()-st
+    print("Solve time:", solve_time)
     print("Solved PMP with", res.get_solver_id().name())
     x = res.GetSolution(x)
 
@@ -101,10 +108,10 @@ def plot_state_trajectory(x):
     """
     Make a simple plot of the given state trajectory.
     """
+    plt.figure()
     plt.plot(x.T)
     plt.xlabel("timestep")
     plt.ylabel("state")
-    plt.show()
 
 if __name__=="__main__":
     # Dynamics
@@ -122,9 +129,14 @@ if __name__=="__main__":
     # Number of timesteps
     T = 50
 
-    #x = solve_QP(A, B, Q, R, Qf, x_init, T)
-    x = solve_PMP(A, B, Q, R, Qf, x_init, T)
+    x_QP = solve_QP(A, B, Q, R, Qf, x_init, T)
+    x_PMP = solve_PMP(A, B, Q, R, Qf, x_init, T)
 
-    plot_state_trajectory(x)
+    plot_state_trajectory(x_QP)
+    plt.title("QP")
+    plot_state_trajectory(x_PMP)
+    plt.title("PMP")
+
+    plt.show()
 
 
