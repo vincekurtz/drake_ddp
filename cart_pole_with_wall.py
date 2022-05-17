@@ -10,6 +10,7 @@
 import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
+from pontryagin import PontryaginOptimizer
 
 ####################################
 # Parameters
@@ -19,8 +20,11 @@ T = 1.0
 dt = 5e-3
 playback_rate = 1.0
 
+# "ilqr" or "pmp"
+method = "ilqr"
+
 # Initial state
-x0 = np.array([0.0,np.pi+0.3,-0.5,0])
+x0 = np.array([-0.1,np.pi+0.4,0.0,0])
 
 # Target state
 x_nom = np.array([0,np.pi,0,0])
@@ -124,31 +128,52 @@ plant_ = create_system_model(plant_)
 builder_.ExportInput(plant_.get_actuation_input_port(), "control")
 system_ = builder_.Build()
 
-# Set up the optimizer
-num_steps = int(T/dt)
-ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, autodiff=True)
+if method == "ilqr":
+    # Set up the optimizer
+    num_steps = int(T/dt)
+    ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, 
+            autodiff=True, delta=1e-4)
 
-# Define the optimization problem
-ilqr.SetInitialState(x0)
-ilqr.SetTargetState(x_nom)
-ilqr.SetRunningCost(dt*Q, dt*R)
-ilqr.SetTerminalCost(Qf)
+    # Define the optimization problem
+    ilqr.SetInitialState(x0)
+    ilqr.SetTargetState(x_nom)
+    ilqr.SetRunningCost(dt*Q, dt*R)
+    ilqr.SetTerminalCost(Qf)
 
-# Set initial guess
-#np.random.seed(0)
-#u_guess = 0.01*np.random.normal(size=(1,num_steps-1))
-u_guess = np.zeros((1,num_steps-1))
-ilqr.SetInitialGuess(u_guess)
+    # Set initial guess
+    #np.random.seed(0)
+    #u_guess = 0.01*np.random.normal(size=(1,num_steps-1))
+    u_guess = np.zeros((1,num_steps-1))
+    ilqr.SetInitialGuess(u_guess)
 
-# Solve the optimization problem
-states, inputs, solve_time, optimal_cost = ilqr.Solve()
-print(f"Solved in {solve_time} seconds using iLQR")
-print(f"Optimal cost: {optimal_cost}")
-timesteps = np.arange(0.0,T,dt)
+    # Solve the optimization problem
+    states, inputs, solve_time, optimal_cost = ilqr.Solve()
+    print(f"Solved in {solve_time} seconds using iLQR")
+    print(f"Optimal cost: {optimal_cost}")
+    timesteps = np.arange(0.0,T,dt)
 
-# Set initial conditions
-plant.get_actuation_input_port().FixValue(plant_context, 0)
-plant.SetPositionsAndVelocities(plant_context, x0)
+else:
+    # Custom pontryagin version
+    num_steps = int(T/dt)
+    pmp = PontryaginOptimizer(system_, num_steps)
+
+    # Define the optimization problem
+    pmp.SetInitialState(x0)
+    pmp.SetTargetState(x_nom)
+    pmp.SetRunningCost(dt*Q, dt*R)
+    pmp.SetTerminalCost(Qf)
+
+    # Set initial guess
+    x_guess = np.zeros((4,num_steps))
+    u_guess = np.zeros((1,num_steps-1))
+    l_guess = np.zeros((4,num_steps))
+    pmp.SetInitialGuess(x_guess, u_guess, l_guess)
+
+    # Solve the optimization problem
+    states, inputs, solve_time, optimal_cost = pmp.Solve()
+    print(f"Solved in {solve_time} seconds using PMP")
+    print(f"Optimal cost: {optimal_cost}")
+    timesteps = np.arange(0.0,T,dt)
 
 #####################################
 # Playback

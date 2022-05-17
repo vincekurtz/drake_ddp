@@ -275,7 +275,7 @@ class PontryaginOptimizer():
         # iteration counter
         i = 1
         st = time.time()
-        while i <= 10:
+        while i <= 50:
             st_iter = time.time()
 
             # Stacking all constraints as g(y) = 0
@@ -348,7 +348,7 @@ class PontryaginOptimizer():
                     self.u.T.flatten()])
             
             # Solve the newton system
-            alpha = 1.0
+            alpha = 0.9
             dy = np.linalg.solve(J, -g)
             y = y0 + alpha*dy
 

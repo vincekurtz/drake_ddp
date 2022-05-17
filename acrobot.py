@@ -9,6 +9,7 @@
 import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
+from pontryagin import PontryaginOptimizer
 import time
 
 # Choose what to do
@@ -24,8 +25,8 @@ T = 1.5        # total simulation time (S)
 dt = 1e-2      # simulation timestep
 
 # Solver method
-# must be "ilqr" or "sqp"
-method = "ilqr"
+# must be "ilqr" or "sqp" or "pmp"
+method = "pmp"
 MPC = False      # MPC only works with ilqr for now
 
 # Initial state
@@ -151,6 +152,32 @@ if optimize:
             print(f"Solved in {solve_time} seconds using iLQR")
             print(f"Optimal cost: {optimal_cost}")
             timesteps = np.arange(0.0,T,dt)
+
+    #-----------------------------------------
+    # Experimental Pontryagin method
+    #-----------------------------------------
+    elif method == "pmp":
+        # Set up optimizer
+        num_steps = int(T/dt)
+        pmp = PontryaginOptimizer(system_, num_steps)
+
+        # Define the problem
+        pmp.SetInitialState(x0)
+        pmp.SetTargetState(x_nom)
+
+        pmp.SetRunningCost(dt*Q, dt*R)
+        pmp.SetTerminalCost(Qf)
+
+        # Set initial guess
+        u_guess = np.zeros((1,num_steps-1))
+        x_guess = np.zeros((4, num_steps))
+        l_guess = np.zeros((4, num_steps))
+        pmp.SetInitialGuess(x_guess, u_guess, l_guess)
+
+        states, inputs, solve_time, optimal_cost = pmp.Solve()
+        print(f"Solved in {solve_time} using special PMP method")
+        print(f"Optimal cost: {optimal_cost}")
+        timesteps = np.arange(0.0,T,dt)
 
     #-----------------------------------------
     # Direct Transcription method
