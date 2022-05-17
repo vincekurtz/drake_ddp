@@ -256,122 +256,6 @@ class PontryaginOptimizer():
 
         return fx, fu
 
-    def _calc_g(self):
-        """
-        Compute the value of the constraint function
-
-            g(x,u,lambda) = 0
-
-        which contains the PMP optimality conditions.
-        """
-        n = self.n
-        m = self.m
-        N = self.N
-        g = np.zeros(2*N*n + (N-1)*m)
-
-        # Initial condition x0 = x_init
-        g[0:n] = self.x[:,0] - self.x0
-
-        # Terminal costate condition lambda_T = lf_x(x_T)
-        lf_x, _ = self._terminal_cost_partials(self.x[:,-1])
-        g[n:2*n] = self.costate[:,-1] - lf_x
-
-        # State dynamics x_{t+1} = f(x_t, u_t)
-        for t in range(N-1):
-            x_next = self.x[:,t+1]
-            x_pred = self._calc_dynamics(self.x[:,t], self.u[:,t])
-            g[(2+t)*n:(2+t+1)*n] = x_next - x_pred
-
-        # Costate dynamics lambda_t = lx + fx'*lambda_{t+1}
-        for t in range(N-1):
-            lx, _,_,_,_ = self._running_cost_partials(self.x[:,t], self.u[:,t])
-            fx = self.fx[:,:,t]
-
-            lmbda = self.costate[:,t]
-            lmbda_pred = lx + fx.T@self.costate[:,t+1]
-
-            g[(2+N-1+t)*n:(2+N+t)*n] = lmbda - lmbda_pred
-
-        # Optimal control conditions lu + fu'*lambda_{t+1} = 0
-        start_idx = (2+2*(N-1))*n
-        for t in range(N-1):
-            _, lu, _,_,_ = self._running_cost_partials(self.x[:,t], self.u[:,t])
-            fu = self.fu[:,:,t]
-            lmbda = self.costate[:,t+1]
-
-            g[start_idx+t*m:start_idx+(t+1)*m] = lu + fu.T@lmbda
-
-        return g
-
-    def _calc_grad_g(self):
-        """
-        Compute the gradient of the constraint function
-
-            g(x,u,lambda),
-
-        where g=0 enforces the PMP optimality conditions.
-        """
-        n = self.n
-        m = self.m
-        N = self.N
-        size = 2*N*n + (N-1)*m  # number of variables and constraints
-        grad = np.full((size, size), 0.0)
-
-        # Initial condition x0 = x_init
-        row_start = 0
-        row_end = n
-
-        grad[row_start:row_end,0:n] = np.eye(n)
-        
-        # Terminal costate condition lambda_T = lf_x(x_T)
-        row_start = n
-        row_end = 2*n
-
-        _, lf_xx = self._terminal_cost_partials(self.x[:,-1])
-        grad[row_start:row_end, 2*n:3*n] = -lf_xx
-
-        grad[row_start:row_end, (2*N-1)*n:2*N*n] = np.eye(n)
-        
-        # State dynamics x_{t+1} = f(x_t, u_t)
-        for t in range(N-1):
-            row_start = (2+t)*n
-            row_end = (2+t+1)*n
-
-            fx = self.fx[:,:,t]
-            fu = self.fu[:,:,t]
-
-            grad[row_start:row_end, t*n:(t+1)*n] = -fx
-            grad[row_start:row_end, (t+1)*n:(t+2)*n] = np.eye(n)
-
-            col_start = (2+2*(N-1))*n+t*m
-            col_end = (2+2*(N-1))*n+(t+1)*m
-            grad[row_start:row_end, col_start:col_end] = -fu
-
-        # Costate dynamics lambda_t = lx + fx'*lambda_{t+1}
-        for t in range(N-1):
-            row_start = (2+N-1+t)*n
-            row_end = (2+N+t)*n
-
-            _,_, lxx, _,_ = self._running_cost_partials(self.x[:,t],self.u[:,t])
-            fx = self.fx[:,:,t]
-
-            grad[row_start:row_end, t*n:(t+1)*n] = -lxx
-            grad[row_start:row_end, (N+t)*n:(N+t+1)*n] = np.eye(n)
-            grad[row_start:row_end, (N+t+1)*n:(N+t+2)*n] = -fx.T
-        
-        # Optimal control conditions lu + fu'*lambda_{t+1} = 0
-        for t in range(N-1):
-            row_start = (2+2*(N-1))*n+t*m
-            row_end = (2+2*(N-1))*n+(t+1)*m
-
-            _,_,_, luu ,_ = self._running_cost_partials(self.x[:,t],self.u[:,t])
-            fu = self.fu[:,:,t]
-
-            grad[row_start:row_end, (N+1+t)*n: (N+1+t+1)*n] = fu.T
-            grad[row_start:row_end, row_start:row_end] = luu
-
-        return grad
-
     def Solve(self):
         """
         Solve the optimization problem and return the (locally) optimal
@@ -394,23 +278,18 @@ class PontryaginOptimizer():
         while i <= 1:
             st_iter = time.time()
 
-            # Update all dynamics gradients
-            for t in range(self.N-1):
-                self.fx[:,:,t], self.fu[:,:,t] = \
-                        self._calc_dynamics_partials(self.x[:,t], self.u[:,t])
-
             # DEBUG
-            mp = MathematicalProgram()
-            x = mp.NewContinuousVariables(self.n, self.N, "x")
-            l = mp.NewContinuousVariables(self.n, self.N, "lmbda")
-            u = mp.NewContinuousVariables(self.m, self.N-1, "u")
+            #mp = MathematicalProgram()
+            #x = mp.NewContinuousVariables(self.n, self.N, "x")
+            #l = mp.NewContinuousVariables(self.n, self.N, "lmbda")
+            #u = mp.NewContinuousVariables(self.m, self.N-1, "u")
 
             # Stacking all constraints as g(y) = 0
             # where y = [x;l;u]. J(y) is the associated constraint jacobian.
             n_cons = 2*self.N*self.n + (self.N-1)*self.m
             J = np.zeros((n_cons, n_cons))
             g = np.zeros(n_cons)
-            y = np.hstack([x.T.flatten(), l.T.flatten(), u.T.flatten()])
+            #y = np.hstack([x.T.flatten(), l.T.flatten(), u.T.flatten()])
            
             # Some convienient indeces for dealing with y = [x;l;u]
             x0_idx = 0
@@ -423,8 +302,8 @@ class PontryaginOptimizer():
 
             # Dynamics constraints
             for t in range(self.N-1):
-                fx = self.fx[:,:,t]
-                fu = self.fu[:,:,t]
+                fx, fu = self._calc_dynamics_partials(self.x[:,t], self.u[:,t])
+                x_next = self._calc_dynamics(self.x[:,t], self.u[:,t])
 
                 # Get some useful indices
                 xt_idx = slice(x0_idx + t*self.n, x0_idx + (t+1)*self.n)
@@ -439,8 +318,7 @@ class PontryaginOptimizer():
                 J[fdyn_idx, xt_idx] = -fx
                 J[fdyn_idx, ut_idx] = -fu
 
-                #TODO: use real dynamics here
-                g[fdyn_idx] = self.x[:,t+1] - fx@self.x[:,t] - fu@self.u[:,t]
+                g[fdyn_idx] = self.x[:,t+1] - x_next
 
                 # Backwards dynamics constraints
                 bdyn_idx = slice(self.N*self.n + t*self.n, self.N*self.n +
@@ -475,39 +353,25 @@ class PontryaginOptimizer():
                     self.x.T.flatten(), 
                     self.costate.T.flatten(),
                     self.u.T.flatten()])
-            Aeq = J
-            beq = J@y0 - g
+            
+            #Aeq = J
+            #beq = J@y0 - g
+            #mp.AddLinearEqualityConstraint(Aeq, beq, y)
 
-            mp.AddLinearEqualityConstraint(Aeq, beq, y)
+            #res = ClpSolver().Solve(mp)
+            ##res = Solve(mp)
+            #self.x = res.GetSolution(x)
+            #self.u = res.GetSolution(u)
+            #self.costate = res.GetSolution(l)
 
-            res = ClpSolver().Solve(mp)
-            #res = Solve(mp)
-            self.x = res.GetSolution(x)
-            self.u = res.GetSolution(u)
-            self.costate = res.GetSolution(l)
+            # Solve the newton system
+            dy = np.linalg.solve(J, -g)
+            y = y0 + dy
 
-            ## Construct g(Y) and \grad g(Y)
-            #g = self._calc_g()
-            #grad = self._calc_grad_g()
-
-            ## Solve the newton system
-            #grad += 0.01*np.eye(len(grad))
-            #delta_Y = np.linalg.solve(grad, -g)
-
-            ## Linesearch (?)
-            #alpha = 0.1
-
-            ## Update Y = [x, lambda, u]
-            #Y = np.hstack([
-            #        self.x.flatten(), 
-            #        self.costate.flatten(),
-            #        self.u.flatten()])
-           
-            #Y += alpha * delta_Y
-
-            #self.x = Y[0:self.N*self.n].reshape(self.N,self.n).T
-            #self.costate = Y[self.N*self.n:2*self.N*self.n].reshape(self.N,self.n).T
-            #self.u = Y[2*self.N*self.n:].reshape(self.N-1,self.m).T
+            # Extract the solution
+            self.x = y[x0_idx:l0_idx].reshape(self.N,self.n).T
+            self.costate = y[l0_idx:u0_idx].reshape(self.N,self.n).T
+            self.u = y[u0_idx:].reshape(self.N-1,self.m).T
 
             # Compute some stats
             L = self._calc_total_cost()
