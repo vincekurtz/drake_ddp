@@ -401,45 +401,102 @@ class PontryaginOptimizer():
 
             # DEBUG
             mp = MathematicalProgram()
-            x = mp.NewContinuousVariables(self.n, self.N)
-            l = mp.NewContinuousVariables(self.n, self.N)
-            u = mp.NewContinuousVariables(self.m, self.N-1)
+            x = mp.NewContinuousVariables(self.n, self.N, "x")
+            l = mp.NewContinuousVariables(self.n, self.N, "lmbda")
+            u = mp.NewContinuousVariables(self.m, self.N-1, "u")
 
-            # Initial
-            mp.AddConstraint(eq(
-                x[:,0], self.x0
-            ))
+            ## Initial
+            #mp.AddConstraint(eq(0, x[:,0]-self.x0 ))
+            #for t in range(self.N-1):
+            #    A = self.fx[:,:,t]
+            #    B = self.fu[:,:,t]
+
+            #    # Forward (state) dynamics
+            #    mp.AddConstraint(eq(
+            #        0, x[:,t+1] - A@x[:,t] - B@u[:,t]
+            #    ))
+
+            #    # Backward (costate) dynamics
+            #    mp.AddConstraint(eq(
+            #        0, l[:,t] - 2*self.Q@(x[:,t]-self.x_nom) - A.T@l[:,t+1]
+            #    ))
+
+            #    # Optimal constrol condition
+            #    mp.AddConstraint(eq(
+            #        0, 2*self.R@u[:,t] + B.T@l[:,t+1]
+            #    ))
+
+            ## Costate boundary condition
+            #mp.AddConstraint(eq(
+            #    0, l[:,-1] - 2*self.Qf@(x[:,-1]-self.x_nom)
+            #))
+
+            # Stacking all constraints as G*[x;l;u] - h = 0
+            n_cons = 2*self.N*self.n + (self.N-1)*self.m
+            G = np.zeros((n_cons, n_cons))
+            h = np.zeros(n_cons)
+            y = np.hstack([x.T.flatten(), l.T.flatten(), u.T.flatten()])
+           
+            # Some convienient indeces for dealing with y = [x;l;u]
+            x0_idx = 0
+            l0_idx = self.N*self.n
+            u0_idx = 2*self.N*self.n
+            
+            # Initial constraint
+            h[0:self.n] = self.x0
+            G[0:self.n,0:self.n] = np.eye(self.n)
+
+            # Dynamics constraints
             for t in range(self.N-1):
-                A = self.fx[:,:,t]
-                B = self.fu[:,:,t]
+                fx = self.fx[:,:,t]
+                fu = self.fu[:,:,t]
 
-                # Forward (state) dynamics
-                mp.AddConstraint(eq(
-                    x[:,t+1], A@x[:,t] + B@u[:,t]
-                ))
+                # Get some useful indices
+                xt_idx = slice(x0_idx + t*self.n, x0_idx + (t+1)*self.n)
+                x_next_idx = slice(x0_idx + (t+1)*self.n, x0_idx + (t+2)*self.n)
+                lt_idx = slice(l0_idx + t*self.n, l0_idx + (t+1)*self.n)
+                l_next_idx = slice(l0_idx + (t+1)*self.n, l0_idx + (t+2)*self.n)
+                ut_idx = slice(u0_idx + t*self.m, u0_idx + (t+1)*self.m)
 
-                # Backward (costate) dynamics
-                mp.AddConstraint(eq(
-                    l[:,t], 2*self.Q@(x[:,t]-self.x_nom) + A.T@l[:,t+1]
-                ))
+                # Forward dynamics constraints
+                fdyn_idx = slice((t+1)*self.n, (t+2)*self.n)
+                G[fdyn_idx, x_next_idx] = np.eye(self.n)
+                G[fdyn_idx, xt_idx] = -fx
+                G[fdyn_idx, ut_idx] = -fu
 
-                # Optimal constrol condition
-                mp.AddConstraint(eq(
-                    0, 2*self.R@u[:,t] + B.T@l[:,t+1]
-                ))
+                # Backwards dynamics constraints
+                bdyn_idx = slice(self.N*self.n + t*self.n, self.N*self.n +
+                        (t+1)*self.n)
+                G[bdyn_idx, xt_idx] = -2*self.Q
+                G[bdyn_idx, lt_idx] = np.eye(self.n)
+                G[bdyn_idx, l_next_idx] = -fx.T
+                h[bdyn_idx] = -2*self.Q@self.x_nom
+
+                # Optimal control constraints
+                ctrl_idx = slice(2*self.N*self.n + t*self.m, 2*self.N*self.n +
+                        (t+1)*self.m)
+                G[ctrl_idx, ut_idx] = 2*self.R
+                G[ctrl_idx, l_next_idx] = fu.T
 
             # Costate boundary condition
-            mp.AddConstraint(eq(
-                l[:,-1], 2*self.Qf@(x[:,-1]-self.x_nom)
-            ))
+            t = self.N-1
+            xt_idx = slice(x0_idx + t*self.n, x0_idx + (t+1)*self.n)
+            lt_idx = slice(l0_idx + t*self.n, l0_idx + (t+1)*self.n)
+            bnd_idx = slice(2*self.N*self.n-self.n, 2*self.N*self.n)
+            G[bnd_idx, lt_idx] = np.eye(self.n)
+            G[bnd_idx, xt_idx] = -2*self.Qf
+            h[bnd_idx] = -2*self.Qf@self.x_nom
 
-            res = Solve(mp)
+            mp.AddLinearEqualityConstraint(G, h, y)
+
+            res = ClpSolver().Solve(mp)
+            #res = Solve(mp)
             self.x = res.GetSolution(x)
             self.u = res.GetSolution(u)
             self.costate = res.GetSolution(l)
 
             ## Construct g(Y) and \grad g(Y)
-            #g = self._calc_g()
+            g = self._calc_g()
             #grad = self._calc_grad_g()
 
             ## Solve the newton system
