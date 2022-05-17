@@ -400,30 +400,38 @@ class PontryaginOptimizer():
                         self._calc_dynamics_partials(self.x[:,t], self.u[:,t])
 
             # DEBUG
-            A = self.fx[:,:,0]
-            B = self.fu[:,:,0]
-
             mp = MathematicalProgram()
             x = mp.NewContinuousVariables(self.n, self.N)
             l = mp.NewContinuousVariables(self.n, self.N)
             u = mp.NewContinuousVariables(self.m, self.N-1)
 
+            # Initial
             mp.AddConstraint(eq(
                 x[:,0], self.x0
             ))
             for t in range(self.N-1):
+                A = self.fx[:,:,t]
+                B = self.fu[:,:,t]
+
+                # Forward (state) dynamics
                 mp.AddConstraint(eq(
                     x[:,t+1], A@x[:,t] + B@u[:,t]
                 ))
 
-                x_err = x[:,t] - self.x_nom
-                mp.AddCost(
-                    x_err.T@self.Q@x_err + u[:,t].T@self.R@u[:,t]
-                )
-            x_err = x[:,-1] - self.x_nom
-            mp.AddCost(
-                x_err.T@self.Qf@x_err
-            )
+                # Backward (costate) dynamics
+                mp.AddConstraint(eq(
+                    l[:,t], 2*self.Q@(x[:,t]-self.x_nom) + A.T@l[:,t+1]
+                ))
+
+                # Optimal constrol condition
+                mp.AddConstraint(eq(
+                    0, 2*self.R@u[:,t] + B.T@l[:,t+1]
+                ))
+
+            # Costate boundary condition
+            mp.AddConstraint(eq(
+                l[:,-1], 2*self.Qf@(x[:,-1]-self.x_nom)
+            ))
 
             res = Solve(mp)
             self.x = res.GetSolution(x)
