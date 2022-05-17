@@ -275,21 +275,14 @@ class PontryaginOptimizer():
         # iteration counter
         i = 1
         st = time.time()
-        while i <= 1:
+        while i <= 10:
             st_iter = time.time()
-
-            # DEBUG
-            #mp = MathematicalProgram()
-            #x = mp.NewContinuousVariables(self.n, self.N, "x")
-            #l = mp.NewContinuousVariables(self.n, self.N, "lmbda")
-            #u = mp.NewContinuousVariables(self.m, self.N-1, "u")
 
             # Stacking all constraints as g(y) = 0
             # where y = [x;l;u]. J(y) is the associated constraint jacobian.
             n_cons = 2*self.N*self.n + (self.N-1)*self.m
             J = np.zeros((n_cons, n_cons))
             g = np.zeros(n_cons)
-            #y = np.hstack([x.T.flatten(), l.T.flatten(), u.T.flatten()])
            
             # Some convienient indeces for dealing with y = [x;l;u]
             x0_idx = 0
@@ -354,19 +347,10 @@ class PontryaginOptimizer():
                     self.costate.T.flatten(),
                     self.u.T.flatten()])
             
-            #Aeq = J
-            #beq = J@y0 - g
-            #mp.AddLinearEqualityConstraint(Aeq, beq, y)
-
-            #res = ClpSolver().Solve(mp)
-            ##res = Solve(mp)
-            #self.x = res.GetSolution(x)
-            #self.u = res.GetSolution(u)
-            #self.costate = res.GetSolution(l)
-
             # Solve the newton system
+            alpha = 1.0
             dy = np.linalg.solve(J, -g)
-            y = y0 + dy
+            y = y0 + alpha*dy
 
             # Extract the solution
             self.x = y[x0_idx:l0_idx].reshape(self.N,self.n).T

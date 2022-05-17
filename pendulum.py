@@ -27,7 +27,7 @@ method = "pontryagin"
 x0 = np.array([0.0,0.0])
 
 # Target state
-x_nom = np.array([0.5,0])
+x_nom = np.array([3.1,0])
 
 # Quadratic cost int_{0^T} (x'Qx + u'Ru) + x_T*Qf*x_T
 Q = 0.01*np.diag([0,1])
@@ -54,10 +54,10 @@ def create_system_model(builder, dt):
     X_base_com = RigidTransform(RotationMatrix(),[0,0,length/2])
     rod_base_frame = plant.AddFrame(FixedOffsetFrame("rod_base",
         rod_com_frame, X_base_com))
-    #base_joint = plant.AddJoint(RevoluteJoint("base_joint", plant.world_frame(),
-    #    rod_base_frame, [1,0,0], damping))
-    base_joint = plant.AddJoint(PrismaticJoint("base_joint", plant.world_frame(),
+    base_joint = plant.AddJoint(RevoluteJoint("base_joint", plant.world_frame(),
         rod_base_frame, [1,0,0], damping))
+    #base_joint = plant.AddJoint(PrismaticJoint("base_joint", plant.world_frame(),
+    #    rod_base_frame, [1,0,0], damping))
     plant.AddJointActuator("base_actuator", base_joint)
     rod_shape = Cylinder(radius, length)
     plant.RegisterVisualGeometry(rod, RigidTransform(), rod_shape, "rod_visual", 
