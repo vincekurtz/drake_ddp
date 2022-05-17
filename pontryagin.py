@@ -405,36 +405,11 @@ class PontryaginOptimizer():
             l = mp.NewContinuousVariables(self.n, self.N, "lmbda")
             u = mp.NewContinuousVariables(self.m, self.N-1, "u")
 
-            ## Initial
-            #mp.AddConstraint(eq(0, x[:,0]-self.x0 ))
-            #for t in range(self.N-1):
-            #    A = self.fx[:,:,t]
-            #    B = self.fu[:,:,t]
-
-            #    # Forward (state) dynamics
-            #    mp.AddConstraint(eq(
-            #        0, x[:,t+1] - A@x[:,t] - B@u[:,t]
-            #    ))
-
-            #    # Backward (costate) dynamics
-            #    mp.AddConstraint(eq(
-            #        0, l[:,t] - 2*self.Q@(x[:,t]-self.x_nom) - A.T@l[:,t+1]
-            #    ))
-
-            #    # Optimal constrol condition
-            #    mp.AddConstraint(eq(
-            #        0, 2*self.R@u[:,t] + B.T@l[:,t+1]
-            #    ))
-
-            ## Costate boundary condition
-            #mp.AddConstraint(eq(
-            #    0, l[:,-1] - 2*self.Qf@(x[:,-1]-self.x_nom)
-            #))
-
-            # Stacking all constraints as G*[x;l;u] - h = 0
+            # Stacking all constraints as g(y) = 0
+            # where y = [x;l;u]. J(y) is the associated constraint jacobian.
             n_cons = 2*self.N*self.n + (self.N-1)*self.m
-            G = np.zeros((n_cons, n_cons))
-            h = np.zeros(n_cons)
+            J = np.zeros((n_cons, n_cons))
+            g = np.zeros(n_cons)
             y = np.hstack([x.T.flatten(), l.T.flatten(), u.T.flatten()])
            
             # Some convienient indeces for dealing with y = [x;l;u]
@@ -443,8 +418,8 @@ class PontryaginOptimizer():
             u0_idx = 2*self.N*self.n
             
             # Initial constraint
-            h[0:self.n] = self.x0
-            G[0:self.n,0:self.n] = np.eye(self.n)
+            g[0:self.n] = self.x[:,0] - self.x0
+            J[0:self.n,0:self.n] = np.eye(self.n)
 
             # Dynamics constraints
             for t in range(self.N-1):
@@ -460,34 +435,50 @@ class PontryaginOptimizer():
 
                 # Forward dynamics constraints
                 fdyn_idx = slice((t+1)*self.n, (t+2)*self.n)
-                G[fdyn_idx, x_next_idx] = np.eye(self.n)
-                G[fdyn_idx, xt_idx] = -fx
-                G[fdyn_idx, ut_idx] = -fu
+                J[fdyn_idx, x_next_idx] = np.eye(self.n)
+                J[fdyn_idx, xt_idx] = -fx
+                J[fdyn_idx, ut_idx] = -fu
+
+                #TODO: use real dynamics here
+                g[fdyn_idx] = self.x[:,t+1] - fx@self.x[:,t] - fu@self.u[:,t]
 
                 # Backwards dynamics constraints
                 bdyn_idx = slice(self.N*self.n + t*self.n, self.N*self.n +
                         (t+1)*self.n)
-                G[bdyn_idx, xt_idx] = -2*self.Q
-                G[bdyn_idx, lt_idx] = np.eye(self.n)
-                G[bdyn_idx, l_next_idx] = -fx.T
-                h[bdyn_idx] = -2*self.Q@self.x_nom
+                J[bdyn_idx, xt_idx] = -2*self.Q
+                J[bdyn_idx, lt_idx] = np.eye(self.n)
+                J[bdyn_idx, l_next_idx] = -fx.T
+
+                g[bdyn_idx] = self.costate[:,t] - \
+                        2*self.Q@(self.x[:,t]-self.x_nom) - \
+                            fx.T@self.costate[:,t+1]
 
                 # Optimal control constraints
                 ctrl_idx = slice(2*self.N*self.n + t*self.m, 2*self.N*self.n +
                         (t+1)*self.m)
-                G[ctrl_idx, ut_idx] = 2*self.R
-                G[ctrl_idx, l_next_idx] = fu.T
+                J[ctrl_idx, ut_idx] = 2*self.R
+                J[ctrl_idx, l_next_idx] = fu.T
+
+                g[ctrl_idx] = 2*self.R@self.u[:,t] + fu.T@self.costate[:,t+1]
 
             # Costate boundary condition
             t = self.N-1
             xt_idx = slice(x0_idx + t*self.n, x0_idx + (t+1)*self.n)
             lt_idx = slice(l0_idx + t*self.n, l0_idx + (t+1)*self.n)
             bnd_idx = slice(2*self.N*self.n-self.n, 2*self.N*self.n)
-            G[bnd_idx, lt_idx] = np.eye(self.n)
-            G[bnd_idx, xt_idx] = -2*self.Qf
-            h[bnd_idx] = -2*self.Qf@self.x_nom
+            J[bnd_idx, lt_idx] = np.eye(self.n)
+            J[bnd_idx, xt_idx] = -2*self.Qf
 
-            mp.AddLinearEqualityConstraint(G, h, y)
+            g[bnd_idx] = self.costate[:,t] - 2*self.Qf@(self.x[:,t] - self.x_nom)
+
+            y0 = np.hstack([
+                    self.x.T.flatten(), 
+                    self.costate.T.flatten(),
+                    self.u.T.flatten()])
+            Aeq = J
+            beq = J@y0 - g
+
+            mp.AddLinearEqualityConstraint(Aeq, beq, y)
 
             res = ClpSolver().Solve(mp)
             #res = Solve(mp)
@@ -496,7 +487,7 @@ class PontryaginOptimizer():
             self.costate = res.GetSolution(l)
 
             ## Construct g(Y) and \grad g(Y)
-            g = self._calc_g()
+            #g = self._calc_g()
             #grad = self._calc_grad_g()
 
             ## Solve the newton system
