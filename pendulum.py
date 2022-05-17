@@ -24,7 +24,7 @@ dt = 1e-2      # simulation timestep
 method = "pontryagin"
 
 # Initial state
-x0 = np.array([0.0,0.1])
+x0 = np.array([0.0,0.0])
 
 # Target state
 x_nom = np.array([0.5,0])

@@ -391,7 +391,7 @@ class PontryaginOptimizer():
         # iteration counter
         i = 1
         st = time.time()
-        while i <= 10:
+        while i <= 1:
             st_iter = time.time()
 
             # Update all dynamics gradients
@@ -399,27 +399,59 @@ class PontryaginOptimizer():
                 self.fx[:,:,t], self.fu[:,:,t] = \
                         self._calc_dynamics_partials(self.x[:,t], self.u[:,t])
 
-            # Construct g(Y) and \grad g(Y)
-            g = self._calc_g()
-            grad = self._calc_grad_g()
+            # DEBUG
+            A = self.fx[:,:,0]
+            B = self.fu[:,:,0]
 
-            # Solve the newton system
-            delta_Y = np.linalg.solve(grad, -g)
+            mp = MathematicalProgram()
+            x = mp.NewContinuousVariables(self.n, self.N)
+            l = mp.NewContinuousVariables(self.n, self.N)
+            u = mp.NewContinuousVariables(self.m, self.N-1)
 
-            # Linesearch (?)
-            alpha = 0.00001
+            mp.AddConstraint(eq(
+                x[:,0], self.x0
+            ))
+            for t in range(self.N-1):
+                mp.AddConstraint(eq(
+                    x[:,t+1], A@x[:,t] + B@u[:,t]
+                ))
 
-            # Update Y = [x, u, lambda]
-            Y = np.hstack([
-                    self.x.flatten(), 
-                    self.costate.flatten(),
-                    self.u.flatten()])
+                x_err = x[:,t] - self.x_nom
+                mp.AddCost(
+                    x_err.T@self.Q@x_err + u[:,t].T@self.R@u[:,t]
+                )
+            x_err = x[:,-1] - self.x_nom
+            mp.AddCost(
+                x_err.T@self.Qf@x_err
+            )
+
+            res = Solve(mp)
+            self.x = res.GetSolution(x)
+            self.u = res.GetSolution(u)
+            self.costate = res.GetSolution(l)
+
+            ## Construct g(Y) and \grad g(Y)
+            #g = self._calc_g()
+            #grad = self._calc_grad_g()
+
+            ## Solve the newton system
+            #grad += 0.01*np.eye(len(grad))
+            #delta_Y = np.linalg.solve(grad, -g)
+
+            ## Linesearch (?)
+            #alpha = 0.1
+
+            ## Update Y = [x, lambda, u]
+            #Y = np.hstack([
+            #        self.x.flatten(), 
+            #        self.costate.flatten(),
+            #        self.u.flatten()])
            
-            Y += alpha * delta_Y
+            #Y += alpha * delta_Y
 
-            self.x = Y[0:self.N*self.n].reshape(self.N,self.n).T
-            self.costate = Y[self.N*self.n:2*self.N*self.n].reshape(self.N,self.n).T
-            self.u = Y[2*self.N*self.n:].reshape(self.N-1,self.m).T
+            #self.x = Y[0:self.N*self.n].reshape(self.N,self.n).T
+            #self.costate = Y[self.N*self.n:2*self.N*self.n].reshape(self.N,self.n).T
+            #self.u = Y[2*self.N*self.n:].reshape(self.N-1,self.m).T
 
             # Compute some stats
             L = self._calc_total_cost()
