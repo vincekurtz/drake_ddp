@@ -26,7 +26,7 @@ dt = 1e-2      # simulation timestep
 
 # Solver method
 # must be "ilqr" or "sqp" or "pmp"
-method = "pmp"
+method = "sqp"
 MPC = False      # MPC only works with ilqr for now
 
 # Initial state

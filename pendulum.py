@@ -21,7 +21,7 @@ dt = 1e-2      # simulation timestep
 
 # Solver method
 # must be "ilqr" or "sqp" or "pontryagin"
-method = "pontryagin"
+method = "sqp"
 
 # Initial state
 x0 = np.array([0.0,0.0])

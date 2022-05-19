@@ -264,7 +264,7 @@ if __name__=="__main__":
     # Solve the iLQR problem
     mu0 = x0
     Sigma0 = np.diag([0.05,0])
-    states, inputs, timesteps = solve_mc_ilqr(mu0, Sigma0, x_nom, Q, R, ns=2)
+    states, inputs, timesteps = solve_mc_ilqr(mu0, Sigma0, x_nom, Q, R, ns=10)
 
     # Make a plot of the optimal trajectories
     plot_state_and_control(states, inputs, timesteps, block=False)
