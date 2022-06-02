@@ -21,7 +21,7 @@ dt = 5e-3
 playback_rate = 1.0
 
 # "ilqr" or "pmp"
-method = "pmp"
+method = "ilqr"
 
 # Initial state
 x0 = np.array([-0.1,np.pi+0.4,0.0,0])
@@ -132,7 +132,7 @@ if method == "ilqr":
     # Set up the optimizer
     num_steps = int(T/dt)
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, 
-            autodiff=True, delta=1e-4)
+            autodiff=True, delta=1e-3)
 
     # Define the optimization problem
     ilqr.SetInitialState(x0)
