@@ -15,8 +15,8 @@ import time
 # Parameters
 ####################################
 
-T = 2.0        # total simulation time (S)
-dt = 1e-2      # simulation timestep
+T = 0.5        # total simulation time (S)
+dt = 5e-2      # simulation timestep
 
 # Solver method
 # must be "ilqr" or "sqp"

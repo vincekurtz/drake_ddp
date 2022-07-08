@@ -36,13 +36,13 @@ Qf = np.diag([500,500,1,1])
 
 # Contact model parameters
 dissipation = 0.0              # controls "bounciness" of collisions: lower is bouncier
-hydroelastic_modulus = 2e5     # controls "squishiness" of collisions: lower is squishier
+hydroelastic_modulus = 1e5     # controls "squishiness" of collisions: lower is squishier
 resolution_hint = 0.05         # smaller means a finer mesh
 penetration_allowance = 0.02   # controls "softness" of collisions for point contact model
 mu = 0.5                       # friction coefficient
 
 contact_model = ContactModel.kHydroelastic  # Hydroelastic, Point, or HydroelasticWithFallback
-mesh_type = HydroelasticContactRepresentation.kTriangle  # Triangle or Polygon
+mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 
 ####################################
 # Tools for system setup
@@ -69,7 +69,7 @@ def create_system_model(plant):
     plant.RegisterVisualGeometry(pole, X_BP, Sphere(radius), "visual", orange)
     
     # Add a wall with rigid hydroelastic contact
-    l,w,h = (0.1,0.5,0.5)   
+    l,w,h = (0.1,0.5,1.0)   
     I_W = SpatialInertia(1, np.zeros(3), UnitInertia.SolidBox(l,w,h))
     wall_instance = plant.AddModelInstance("wall")
     wall = plant.AddRigidBody("wall", wall_instance, I_W)
