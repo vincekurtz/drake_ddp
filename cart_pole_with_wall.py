@@ -21,7 +21,7 @@ dt = 5e-3
 playback_rate = 1.0
 
 # "ilqr" or "pmp"
-method = "ilqr"
+method = "pmp"
 
 # Initial state
 x0 = np.array([-0.1,np.pi+0.4,0.0,0])

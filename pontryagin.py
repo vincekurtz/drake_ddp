@@ -352,6 +352,10 @@ class PontryaginOptimizer():
             dy = np.linalg.solve(J, -g)
             y = y0 + alpha*dy
 
+            print("control starts at ", u0_idx)
+            plt.imshow(J != 0)
+            plt.show()
+
             # Extract the solution
             self.x = y[x0_idx:l0_idx].reshape(self.N,self.n).T
             self.costate = y[l0_idx:u0_idx].reshape(self.N,self.n).T
