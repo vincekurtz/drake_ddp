@@ -13,7 +13,7 @@ from mcilqr import MonteCarloIterativeLQR
 import time
 import matplotlib.pyplot as plt
 
-def create_system_model(builder, collision=True, opacity=1.0):
+def create_system_model(builder, collision=True, opacity=1.0, scene_graph=None):
     """
     Create and return a plant and scene graph for the simple pendulum system.
     """
@@ -24,7 +24,19 @@ def create_system_model(builder, collision=True, opacity=1.0):
     damping = 0.1
 
     # Create the plant and scene graph
-    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
+    if scene_graph is None:
+        plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
+    else:
+        plant = builder.AddSystem(MultibodyPlant(time_step=dt))
+        plant.RegisterAsSourceForSceneGraph(scene_graph)
+        builder.Connect(
+                plant.get_geometry_poses_output_port(),
+                scene_graph.get_source_pose_port(plant.get_source_id()))
+        builder.Connect(
+                scene_graph.get_query_output_port(),
+                plant.get_geometry_query_input_port())
+
+
 
     # Create the pendulum object
     pendulum = plant.AddModelInstance("pendulum")
@@ -110,14 +122,14 @@ def set_up_dummy_visualizer_system(num_copies):
     the system at once. 
     """
     builder = DiagramBuilder()
+    scene_graph = builder.AddSystem(SceneGraph())
     for i in range(num_copies):
         plant, scene_graph = create_system_model(builder, collision=False,
-                opacity=0.5)
+                opacity=0.5, scene_graph=scene_graph)
         plant.set_name(f"plant_{i}")
-        scene_graph.set_name(f"scene_graph_{i}")
-    
+   
     DrakeVisualizer().AddToBuilder(builder, scene_graph)
-    ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+    #ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
     diagram = builder.Build()
     diagram_context = diagram.CreateDefaultContext()
@@ -159,19 +171,20 @@ def playback_state_trajectories(states, timesteps):
     # Set up a system for visualizing all the state trajectories
     diagram, context = set_up_dummy_visualizer_system(ns)
 
-    plt.figure()
-    plot_system_graphviz(diagram, max_depth=1)
-    plt.show()
+    #plt.figure()
+    #plot_system_graphviz(diagram, max_depth=1)
+    #plt.show()
 
-    sys.exit()
-    #diagrams = []
-    #contexts = []
-    #for i in range(ns):
-    #    diagram, diagram_context, plant, plant_context = set_up_visualizer_system()
-    #    plant.get_actuation_input_port().FixValue(plant_context, [0])
+    plants = []
+    plant_contexts = []
 
-    #    diagrams.append(diagram)
-    #    contexts.append(diagram_context)
+    for i in range(ns):
+        plant_i = diagram.GetSubsystemByName(f"plant_{i}")
+        context_i = diagram.GetMutableSubsystemContext(plant_i, context)
+        plant_i.get_actuation_input_port().FixValue(context_i, [0])
+
+        plants.append(plant_i)
+        plant_contexts.append(context_i)
 
     j = 0
     while True:
@@ -181,13 +194,12 @@ def playback_state_trajectories(states, timesteps):
         # Just keep playing back the trajectory
         for i in range(len(timesteps)):
             for j in range(ns):
-                t = timesteps[i]
                 x = states[j*2:(j+1)*2,i]
-
-                contexts[j].SetTime(t)
-                contexts[j].SetDiscreteState(x)
-                diagrams[j].Publish(contexts[j])
-
+                plant_contexts[j].SetDiscreteState(x)
+                
+            t = timesteps[i]
+            context.SetTime(t)
+            diagram.ForcedPublish(context)
             if i==0:
                 # Wait a bit on first timestep to show initial state
                 time.sleep(0.5)
@@ -264,13 +276,13 @@ if __name__=="__main__":
     # Solve the iLQR problem
     mu0 = x0
     Sigma0 = np.diag([0.05,0])
-    states, inputs, timesteps = solve_mc_ilqr(mu0, Sigma0, x_nom, Q, R, ns=1)
+    states, inputs, timesteps = solve_mc_ilqr(mu0, Sigma0, x_nom, Q, R, ns=2)
 
     # Make a plot of the optimal trajectories
-    plot_state_and_control(states, inputs, timesteps, block=False)
+    #plot_state_and_control(states, inputs, timesteps, block=True)
 
     # Play back the state trajectories in sequence
-   # playback_state_trajectories(states, timesteps)
+    playback_state_trajectories(states, timesteps)
 
     # Simulate optimal control from new initial conditions
     #while True:

@@ -264,7 +264,7 @@ class MonteCarloIterativeLQR():
 
             # Compute the forward dynamics x_next = f(x,u)
             state = self.context.get_discrete_state()
-            self.system.CalcDiscreteVariableUpdates(self.context, state)
+            self.system.CalcForcedDiscreteVariableUpdate(self.context, state)
             x_next = state.get_vector().value().flatten()
 
             z_next[i*self.nx:(i+1)*self.nx] = x_next
@@ -302,7 +302,7 @@ class MonteCarloIterativeLQR():
 
             # Compute the forward dynamics x_next = f(x,u)
             state = self.context_ad.get_discrete_state()
-            self.system_ad.CalcDiscreteVariableUpdates(self.context_ad, state)
+            self.system_ad.CalcForcedDiscreteVariableUpdate(self.context_ad, state)
             x_next = state.get_vector().CopyToVector()
            
             # Compute partial derivatives
