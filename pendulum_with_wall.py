@@ -206,7 +206,7 @@ def playback_state_trajectories(states, timesteps):
             time.sleep(dt-3e-4)
         time.sleep(1)
 
-def solve_mc_ilqr(mu0, Sigma0, x_nom, Q, R, ns):
+def solve_mc_ilqr(mu0, Sigma0, x_nom, Q, R, Qf, ns, u_guess=None):
     """
     Solve the monte-carlo iLQR problem with the given
     initial state distribution, target state, cost matrices, and 
@@ -231,10 +231,11 @@ def solve_mc_ilqr(mu0, Sigma0, x_nom, Q, R, ns):
     ilqr.SetTerminalCost(Qf)
 
     # Set initial guess
-    u_guess = np.zeros((1,num_steps-1))
+    if u_guess is None:
+        u_guess = np.zeros((1,num_steps-1))
     ilqr.SetInitialGuess(u_guess)
 
-    states, inputs, solve_time, optimal_cost = ilqr.Solve()
+    states, inputs, solve_time, optimal_cost = ilqr.Solve(max_iters=10)
     print(f"Solved in {solve_time} seconds using iLQR")
     print(f"Optimal cost: {optimal_cost}")
     timesteps = np.arange(0.0,T,dt)
@@ -266,17 +267,21 @@ if __name__=="__main__":
     T = 1.0         # total simulation time (S)
     dt = 1e-2       # simulation timestep
 
-    x0 = np.array([0.8*np.pi,0])  # initial state
+    x0 = np.array([3.0,0])  # initial state
     x_nom = np.array([np.pi,0])   # target state
 
-    Q = np.diag([100,10])   # Quadratic cost
+    Q = np.diag([10,1])   # Quadratic cost
     R = 0.01*np.eye(1)      # int_{0^T} (x'Qx + u'Ru) + x_T*Qf*x_T
     Qf = np.diag([150,10])
 
     # Solve the iLQR problem
     mu0 = x0
-    Sigma0 = np.diag([0.05,0])
-    states, inputs, timesteps = solve_mc_ilqr(mu0, Sigma0, x_nom, Q, R, ns=2)
+    Sigma0 = np.diag([0.1,0])
+    
+    num_steps = int(T/dt)
+    u_guess = np.zeros((1,num_steps-1)) - 5.0
+    states, inputs, timesteps = solve_mc_ilqr(mu0, Sigma0, x_nom, Q, R, Qf,
+            ns=10, u_guess=u_guess)
 
     # Make a plot of the optimal trajectories
     #plot_state_and_control(states, inputs, timesteps, block=True)

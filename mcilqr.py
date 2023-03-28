@@ -457,10 +457,13 @@ class MonteCarloIterativeLQR():
             Vz = Qz - Qu.T@Quu_inv@Quz
             Vzz = Qzz - Quz.T@Quu_inv@Quz
 
-    def Solve(self):
+    def Solve(self, max_iters=10):
         """
         Solve the optimization problem and return the (locally) optimal
         state and input trajectories. 
+
+        Args:
+            max_iters: maximum number of iterations
 
         Return:
             z:              (n,N) numpy array containing optimal state
@@ -481,7 +484,7 @@ class MonteCarloIterativeLQR():
         # iteration counter
         i = 1
         st = time.time()
-        while improvement > self.delta:
+        while i < max_iters:
             st_iter = time.time()
 
             L_new, eps, ls_iters = self._forward_pass(L)
