@@ -7,6 +7,7 @@
 #
 ##
 
+import time
 import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
@@ -281,7 +282,7 @@ if playback:
 
             diagram_context.SetTime(t)
             plant.SetPositionsAndVelocities(plant_context, x)
-            diagram.Publish(diagram_context)
+            diagram.ForcedPublish(diagram_context)
 
             time.sleep(1/playback_rate*dt-4e-4)
         time.sleep(1)

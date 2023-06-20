@@ -7,6 +7,7 @@
 #
 ##
 
+import time
 import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
@@ -181,12 +182,13 @@ for i in range(num_resolves):
     start_idx = (i+1)*replan_steps
     end_idx = start_idx + num_steps
     states[:,start_idx:end_idx] = x
-
+    
     # Update the visualizer so we have a general sense of what
     # the optimizer is doing
     diagram_context.SetTime(end_idx*dt)
+    plant.get_actuation_input_port().FixValue(plant_context, u[:,-1])
     plant.SetPositionsAndVelocities(plant_context, x[:,-1])
-    diagram.Publish(diagram_context)
+    diagram.ForcedPublish(diagram_context)
     
 
 solve_time = time.time() - st
@@ -207,7 +209,7 @@ while True:
 
         diagram_context.SetTime(t)
         plant.SetPositionsAndVelocities(plant_context, x)
-        diagram.Publish(diagram_context)
+        diagram.ForcedPublish(diagram_context)
 
         time.sleep(1/playback_rate*dt-4e-4)
     time.sleep(1)

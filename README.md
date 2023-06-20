@@ -26,7 +26,7 @@ python cart_pole_with_wall.py
 
 ## Examples
 
-The `drake-visualizer` must be running to view the generated trajectories. Further parameters can be found in each python script. 
+Meldis (`python -m pydrake.visualization.meldis`) must be running to view the generated trajectories. Further parameters can be found in each python script. 
 
 Code for running iLQR over arbitrary discrete-time Drake `System` objects is provided in [`ilqr.py`](ilqr.py). 
 
