@@ -62,3 +62,6 @@ These are more complex examples that require making and breaking contact. Contac
 
 ![](images/mini_cheetah.gif)
 
+[`panda_fr3.py`](panda_fr3.py) Perform whole-arm manipulation of a large ball using a Franka Emika Panda FR3 manipulator. 
+
+![](images/panda.gif)
