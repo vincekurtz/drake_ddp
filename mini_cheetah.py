@@ -11,6 +11,10 @@ import time
 import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
+import utils_derivs_interpolation
+
+meshcat = StartMeshcat()
+MESHCAT_VISUALISATION = True
 
 ####################################
 # Parameters
@@ -106,8 +110,13 @@ plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
 plant = create_system_model(plant)
 
 # Connect to visualizer
-DrakeVisualizer().AddToBuilder(builder, scene_graph)
-ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+if MESHCAT_VISUALISATION:
+    visualizer = MeshcatVisualizer.AddToBuilder( 
+        builder, scene_graph, meshcat,
+        MeshcatVisualizerParams(role=Role.kPerception, prefix="visual"))
+else:
+    DrakeVisualizer().AddToBuilder(builder, scene_graph)
+    ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
 # Finailze the diagram
 diagram = builder.Build()

@@ -11,6 +11,10 @@ import time
 import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
+import utils_derivs_interpolation
+
+meshcat = StartMeshcat()
+MESHCAT_VISUALISATION = True
 
 ####################################
 # Parameters
@@ -100,8 +104,13 @@ plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
 plant = create_system_model(plant)
 
 # Connect to visualizer
-DrakeVisualizer().AddToBuilder(builder, scene_graph)
-ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+if MESHCAT_VISUALISATION:
+    visualizer = MeshcatVisualizer.AddToBuilder( 
+        builder, scene_graph, meshcat,
+        MeshcatVisualizerParams(role=Role.kPerception, prefix="visual"))
+else:
+    DrakeVisualizer().AddToBuilder(builder, scene_graph)
+    ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
 # Finailze the diagram
 diagram = builder.Build()
@@ -123,7 +132,10 @@ system_ = builder_.Build()
 
 # Set up the optimizer
 num_steps = int(T/dt)
-ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5)
+# interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 2, 10, 0.0007, 0.0007)
+interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
+# interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 10, 0, 0, 0.00005)
+ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, derivs_keypoint_method = interpolation_method)
 
 # Define the optimization problem
 ilqr.SetInitialState(x0)

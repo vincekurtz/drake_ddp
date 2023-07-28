@@ -16,7 +16,7 @@ import utils_derivs_interpolation
 # Parameters
 ####################################
 
-T = 10        # total simulation time (S)
+T = 10       # total simulation time (S)
 dt = 0.004      # simulation timestep
 
 meshcat = StartMeshcat()
@@ -65,7 +65,6 @@ builder.Connect(
         plant.get_actuation_input_port())
 
 if(MESHCAT_VISUALISATION):
-    print("meshcat visualisation")
     visualizer = MeshcatVisualizer.AddToBuilder( 
         builder, scene_graph, meshcat,
         MeshcatVisualizerParams(role=Role.kPerception, prefix="visual"))
@@ -108,7 +107,7 @@ if method == "ilqr":
     # Set up optimizer
     num_steps = int(T/dt)
     # interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 5, 100, 0.0007, 0.0007)
-    interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 5, 0, 0, 0)
+    interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
     # interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 10, 0, 0, 0.00005)
     ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
             input_port_index=input_port_index,

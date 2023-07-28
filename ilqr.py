@@ -373,7 +373,7 @@ class IterativeLinearQuadraticRegulator():
         timeStart = time.time()
         self._get_derivatives(x, u)
         timeEnd = time.time()
-        self.time_derivatives = timeEnd - timeStart
+        self.time_getDerivs = timeEnd - timeStart
 
         # Update stored values
         self.u_bar = u
@@ -397,7 +397,7 @@ class IterativeLinearQuadraticRegulator():
 
         # Debug variable to plot some useful graphs if required, also calculates the 
         # derivatives at every time step and compute the error of the interpolation
-        # for debugging purposes
+        # for debugging
         DEBUG = False
         # plt.plot(x[2,:])
 
@@ -714,9 +714,9 @@ class IterativeLinearQuadraticRegulator():
         improvement = np.inf
 
         # Print labels for debug info
-        print("---------------------------------------------------------------------------------")
-        print("|    iter    |    cost    |    eps    |    ls    |    iter time    |    time    |")
-        print("---------------------------------------------------------------------------------")
+        print("----------------------------------------------------------------------------------------------------------------------------------")
+        print("|    iter    |    cost    |    eps    |    ls    | derivs time | derivs '%'  | bp time  | fp time  |   iter time    |    time    |")
+        print("----------------------------------------------------------------------------------------------------------------------------------")
 
         # iteration counter
         i = 1
@@ -730,7 +730,7 @@ class IterativeLinearQuadraticRegulator():
             iter_time = time.time() - st_iter
             total_time = time.time() - st
 
-            print(f"{i:^14}{L_new:11.4f}  {eps:^12.4f}{ls_iters:^11}     {iter_time:1.5f}          {total_time:4.2f}")
+            print(f"{i:^14}{L_new:11.4f}  {eps:^12.4f}{ls_iters:^11}   {self.time_getDerivs:1.5f}         {self.percentage_derivs:.1f}       {self.time_backwardsPass:1.5f}    {self.time_fp:1.5f}      {iter_time:1.5f}          {total_time:4.2f}")
 
             improvement = L - L_new
             L = L_new

@@ -11,6 +11,7 @@ import time
 import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
+import utils_derivs_interpolation
 
 # Choose what to do
 simulate = False   # Run a simple simulation with fixed input
@@ -21,6 +22,9 @@ playback = True    # Visualize the optimal trajectory by playing it back.
 
 scenario = "side"   # "lift", "forward", or "side"
 save_file = scenario + ".npz"
+
+meshcat = StartMeshcat()
+MESHCAT_VISUALISATION = True
 
 ####################################
 # Parameters
@@ -209,9 +213,15 @@ plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
 plant, scene_graph = create_system_model(plant, scene_graph)
 
 # Connect to visualizer
-params = DrakeVisualizerParams(role=Role.kProximity, show_hydroelastic=True)
-DrakeVisualizer(params=params).AddToBuilder(builder, scene_graph)
-ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+if MESHCAT_VISUALISATION:
+    visualizer = MeshcatVisualizer.AddToBuilder( 
+        builder, scene_graph, meshcat,
+        MeshcatVisualizerParams(role=Role.kPerception, prefix="visual"))
+else:
+    params = DrakeVisualizerParams(role=Role.kProximity, show_hydroelastic=True)
+    DrakeVisualizer(params=params).AddToBuilder(builder, scene_graph)
+    ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+
 
 # Finailze the diagram
 diagram = builder.Build()
@@ -232,8 +242,12 @@ if optimize:
 
     # Set up the optimizer
     num_steps = int(T/dt)
+    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 5, 0, 0, 0)
+    interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 5, 40, 1e-3, 0)
+    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
+    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 5, 0, 0, 1e-10)
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-            beta=0.5, delta=1e-3, gamma=0)
+            beta=0.5, delta=1e-3, gamma=0, derivs_keypoint_method = interpolation_method)
 
     # Define the optimization problem
     ilqr.SetInitialState(x0)

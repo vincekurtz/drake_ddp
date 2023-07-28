@@ -10,20 +10,25 @@ import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
 import time
+import utils_derivs_interpolation
+
+meshcat = StartMeshcat()
+MESHCAT_VISUALISATION = True
 
 ####################################
 # Parameters
 ####################################
 
-T = 1.0        # total simulation time (S)
-dt = 1e-2      # simulation timestep
+T = 2.0        # total simulation time (S)
+dt = 0.01      # simulation timestep
 
 # Solver method
 # must be "ilqr" or "sqp"
 method = "ilqr"
 
 # Initial state
-x0 = np.array([0,np.pi-0.1,0,0])
+# x0 = np.array([0,np.pi-0.1,0,0])
+x0 = np.array([0,0,0,0])
 
 # Target state
 x_nom = np.array([0,np.pi,0,0])
@@ -56,8 +61,13 @@ builder.Connect(
         controller.get_output_port(),
         plant.get_actuation_input_port())
 
-DrakeVisualizer().AddToBuilder(builder, scene_graph)
-ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+if MESHCAT_VISUALISATION:
+    visualizer = MeshcatVisualizer.AddToBuilder( 
+        builder, scene_graph, meshcat,
+        MeshcatVisualizerParams(role=Role.kPerception, prefix="visual"))
+else:
+    DrakeVisualizer().AddToBuilder(builder, scene_graph)
+    ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
 diagram = builder.Build()
 diagram_context = diagram.CreateDefaultContext()
@@ -80,9 +90,12 @@ input_port_index = plant_.get_actuation_input_port().get_index()
 if method == "ilqr":
     # Set up the optimizer
     num_steps = int(T/dt)
+    # interp_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 2, 5, 1e-4, 0)
+    interp_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
+    # interp_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 5, 0, 0, 0.0001)
     ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
             input_port_index=input_port_index,
-            beta=0.9)
+            beta=0.9, derivs_keypoint_method=interp_method)
 
     # Define initial and target states
     ilqr.SetInitialState(x0)
