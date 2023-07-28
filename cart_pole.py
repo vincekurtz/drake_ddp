@@ -90,8 +90,8 @@ input_port_index = plant_.get_actuation_input_port().get_index()
 if method == "ilqr":
     # Set up the optimizer
     num_steps = int(T/dt)
-    # interp_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 2, 5, 1e-4, 0)
-    interp_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
+    interp_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 5, 10, 1e-4, 0)
+    # interp_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
     # interp_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 5, 0, 0, 0.0001)
     ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
             input_port_index=input_port_index,

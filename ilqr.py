@@ -7,6 +7,7 @@
 from pydrake.all import *
 import time
 import numpy as np
+import matplotlib.pyplot as plt
 import utils_derivs_interpolation
 
 class IterativeLinearQuadraticRegulator():
@@ -403,6 +404,7 @@ class IterativeLinearQuadraticRegulator():
 
         if(DEBUG and self.derivs_interpolation.keypoint_method == 'adaptiveJerk'):
             jerkProfile = self.calc_jerk_profile(x)
+            plt.title("jerk profile")
             plt.plot(jerkProfile[:,0])
             plt.show()
 
@@ -418,7 +420,8 @@ class IterativeLinearQuadraticRegulator():
         else:
             raise Exception('unknown interpolation method')
 
-        self.percentage_derivs = len(keyPoints) / self.N * 100
+        # print("len keypoints: ", len(keyPoints), " horizon: ", self.N, "%")
+        self.percentage_derivs = (len(keyPoints) / (self.N - 1)) * 100
         # print(keyPoints)
 
         if(DEBUG):
@@ -432,17 +435,27 @@ class IterativeLinearQuadraticRegulator():
         self.interpolate_derivatives(keyPoints)
         indexX = 0
         indexY = 3
+        error_fx, error_fu = self.calc_error_of_interpolation()
 
-        if(DEBUG):
-            error_fx, error_fu = self.calc_error_of_interpolation()
-
+        if(DEBUG):  
             print(f'error fx: {error_fx} error fu:  {error_fu}')
-            for i in range(self.n):
-                for j in range(self.n):
-                    plt.plot(self.fx[i,j,:], label="interpolations")
-                    plt.plot(self.fx_baseline[i,j,:], label="baseline")
-                    plt.legend()
-                    plt.show()
+            plt.title(f"error fx row {indexX} col {indexY}")
+            plt.plot(self.fx[indexX,indexY,:], label="interpolations")
+            plt.plot(self.fx_baseline[indexX,indexY,:], label="baseline")
+            plt.legend()
+            plt.show()    
+
+        # if(DEBUG):
+        #     error_fx, error_fu = self.calc_error_of_interpolation()
+
+        #     print(f'error fx: {error_fx} error fu:  {error_fu}')
+        #     for i in range(self.n):
+        #         for j in range(self.n):
+        #             plt.title(f"error fx row {i} col {j}")
+        #             plt.plot(self.fx[i,j,:], label="interpolations")
+        #             plt.plot(self.fx_baseline[i,j,:], label="baseline")
+        #             plt.legend()
+        #             plt.show()
 
     def get_keypoints_set_interval(self):
         """
@@ -485,6 +498,7 @@ class IterativeLinearQuadraticRegulator():
                     if jerk_profile[t, i] > self.derivs_interpolation.jerk_threshold:
                         keypoints.append(t)
                         counter = 0
+                        break
             
             if counter >= self.derivs_interpolation.maxN:
                 keypoints.append(t)
@@ -534,7 +548,7 @@ class IterativeLinearQuadraticRegulator():
         start_index = 0
         end_index = self.N-2
 
-        initial_index_tuple = utils_derivs.index_tuple(start_index, end_index)
+        initial_index_tuple = utils_derivs_interpolation.index_tuple(start_index, end_index)
         list_indices_to_check = [initial_index_tuple]
         sub_list_with_midpoints = []
 
@@ -548,8 +562,8 @@ class IterativeLinearQuadraticRegulator():
                 mid_index = int((list_indices_to_check[i].start_index + list_indices_to_check[i].end_index)/2)
 
                 if not approximation_good:
-                    sub_list_indices.append(utils_derivs.index_tuple(list_indices_to_check[i].start_index, mid_index))
-                    sub_list_indices.append(utils_derivs.index_tuple(mid_index, list_indices_to_check[i].end_index))
+                    sub_list_indices.append(utils_derivs_interpolation.index_tuple(list_indices_to_check[i].start_index, mid_index))
+                    sub_list_indices.append(utils_derivs_interpolation.index_tuple(mid_index, list_indices_to_check[i].end_index))
                     all_checks_passed = False
 
                 else:
@@ -651,6 +665,28 @@ class IterativeLinearQuadraticRegulator():
             for j in range(startIndex, endIndex):
                 self.fx[:,:,j] = startVals_fx + (endVals_fx - startVals_fx) * (j - startIndex) / (endIndex - startIndex)
                 self.fu[:,:,j] = startVals_fu + (endVals_fu - startVals_fu) * (j - startIndex) / (endIndex - startIndex)
+
+    def calc_error_of_interpolation(self):
+        error_fx = 0
+        error_fu = 0
+
+        for t in range(self.N-1):
+            diff_fx = self.diff_between_matrices(self.fx[:,:,t], self.fx_baseline[:,:,t])
+            diff_fu = self.diff_between_matrices(self.fu[:,:,t], self.fu_baseline[:,:,t])
+
+            error_fx += diff_fx
+            error_fu += diff_fu
+
+        return error_fx, error_fu
+
+    def diff_between_matrices(self, matrix1, matrix2):
+        diff = 0
+
+        for i in range(matrix1.shape[0]):
+            for j in range(matrix1.shape[1]):
+                diff += abs(matrix1[i,j] - matrix2[i,j])
+
+        return diff
     
     def _backward_pass(self):
         """
@@ -725,7 +761,10 @@ class IterativeLinearQuadraticRegulator():
             st_iter = time.time()
 
             L_new, eps, ls_iters = self._forward_pass(L)
+            bp_time_start = time.time()
             self._backward_pass()
+            bp_end_time = time.time()
+            self.time_backwardsPass = bp_end_time - bp_time_start
 
             iter_time = time.time() - st_iter
             total_time = time.time() - st

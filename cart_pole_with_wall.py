@@ -132,9 +132,9 @@ system_ = builder_.Build()
 
 # Set up the optimizer
 num_steps = int(T/dt)
-# interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 2, 10, 0.0007, 0.0007)
-interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
-# interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 10, 0, 0, 0.00005)
+# interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 1, 20, 0.01, 0)
+# interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
+interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 2, 0, 0, 0.0002)
 ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, derivs_keypoint_method = interpolation_method)
 
 # Define the optimization problem

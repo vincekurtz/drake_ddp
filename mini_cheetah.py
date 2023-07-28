@@ -152,8 +152,12 @@ def solve_ilqr(solver, x0, u_guess, move_target=False):
 
 # Set up the optimizer
 num_steps = int(T/dt)
+# interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 5, 0, 0, 0)
+interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 2, 5, 1e-3, 0)
+# interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
+# interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 5, 0, 0, 1e-10)
 ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-        beta=0.5, delta=1e-2, gamma=0)
+        beta=0.5, delta=1e-2, gamma=0, derivs_keypoint_method=interpolation_method)
 
 # Define the optimization problem
 ilqr.SetTargetState(x_nom)
