@@ -400,7 +400,6 @@ class IterativeLinearQuadraticRegulator():
         # derivatives at every time step and compute the error of the interpolation
         # for debugging
         DEBUG = False
-        # plt.plot(x[2,:])
 
         if(DEBUG and self.derivs_interpolation.keypoint_method == 'adaptiveJerk'):
             jerkProfile = self.calc_jerk_profile(x)
@@ -408,7 +407,7 @@ class IterativeLinearQuadraticRegulator():
             plt.plot(jerkProfile[:,0])
             plt.show()
 
-        # Calculate derivatives at key points
+        # Calculate keypoints over the trajectory
         keyPoints = []
         if(self.derivs_interpolation.keypoint_method == 'setInterval'):
             keyPoints = self.get_keypoints_set_interval()
@@ -420,19 +419,21 @@ class IterativeLinearQuadraticRegulator():
         else:
             raise Exception('unknown interpolation method')
 
-        # print("len keypoints: ", len(keyPoints), " horizon: ", self.N, "%")
         self.percentage_derivs = (len(keyPoints) / (self.N - 1)) * 100
-        # print(keyPoints)
 
         if(DEBUG):
             for t in range(self.N-1):
                 self.fx_baseline[:,:,t], self.fu_baseline[:,:,t] = self._calc_dynamics_partials(x[:,t], u[:,t])
 
+        # Calculate derivatives at keypoints
         if self.derivs_interpolation.keypoint_method != 'iterativeError':
             for t in range(len(keyPoints)):
                 self.fx[:,:,keyPoints[t]], self.fu[:,:,keyPoints[t]] = self._calc_dynamics_partials(x[:,keyPoints[t]], u[:,keyPoints[t]])
 
-        self.interpolate_derivatives(keyPoints)
+        # Interpolate derivatives if required
+        if not (self.derivs_interpolation.keypoint_method == 'setInterval' and self.derivs_interpolation.minN == 1):
+            self.interpolate_derivatives(keyPoints)
+        
         indexX = 0
         indexY = 3
         error_fx, error_fu = self.calc_error_of_interpolation()
