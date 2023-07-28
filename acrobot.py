@@ -10,18 +10,22 @@ import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
 import time
+import utils_derivs_interpolation
 
 ####################################
 # Parameters
 ####################################
 
-T = 1.5        # total simulation time (S)
-dt = 1e-2      # simulation timestep
+T = 10        # total simulation time (S)
+dt = 0.004      # simulation timestep
+
+meshcat = StartMeshcat()
 
 # Solver method
 # must be "ilqr" or "sqp"
 method = "ilqr"
-MPC = True      # MPC only works with ilqr for now
+MPC = False                         # MPC only works with ilqr for now
+MESHCAT_VISUALISATION = True        # Visualisation with meshcat or drake visualizer
 
 # Initial state
 x0 = np.array([0,0,0,0])
@@ -44,6 +48,9 @@ def create_system_model(plant):
     plant.Finalize()
     return plant
 
+meshcat.Delete()
+meshcat.DeleteAddedControls()
+
 ####################################
 # Create system diagram
 ####################################
@@ -57,8 +64,15 @@ builder.Connect(
         controller.get_output_port(),
         plant.get_actuation_input_port())
 
-DrakeVisualizer().AddToBuilder(builder, scene_graph)
-ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+if(MESHCAT_VISUALISATION):
+    print("meshcat visualisation")
+    visualizer = MeshcatVisualizer.AddToBuilder( 
+        builder, scene_graph, meshcat,
+        MeshcatVisualizerParams(role=Role.kPerception, prefix="visual"))
+else:
+    DrakeVisualizer().AddToBuilder(builder, scene_graph)
+    ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+
 
 diagram = builder.Build()
 diagram_context = diagram.CreateDefaultContext()
@@ -93,9 +107,12 @@ def solve_ilqr(solver, x0, u_guess):
 if method == "ilqr":
     # Set up optimizer
     num_steps = int(T/dt)
+    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 5, 100, 0.0007, 0.0007)
+    interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 5, 0, 0, 0)
+    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 10, 0, 0, 0.00005)
     ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
             input_port_index=input_port_index,
-            beta=0.5)
+            beta=0.5, derivs_keypoint_method = interpolation_method)
 
     # Define the problem
     ilqr.SetTargetState(x_nom)
@@ -197,6 +214,7 @@ def playback(states, timesteps):
     being defined outside of the scope of this function and connected
     to the Drake visualizer.
     """
+    print("begin publishing")
     while True:
         # Just keep playing back the trajectory
         for i in range(len(timesteps)):
