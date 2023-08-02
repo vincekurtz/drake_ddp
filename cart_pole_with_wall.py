@@ -13,8 +13,7 @@ from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
 import utils_derivs_interpolation
 
-meshcat = StartMeshcat()
-MESHCAT_VISUALISATION = True
+meshcat_visualisation = True
 
 ####################################
 # Parameters
@@ -104,7 +103,8 @@ plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
 plant = create_system_model(plant)
 
 # Connect to visualizer
-if MESHCAT_VISUALISATION:
+if meshcat_visualisation:
+    meshcat = StartMeshcat()
     visualizer = MeshcatVisualizer.AddToBuilder( 
         builder, scene_graph, meshcat,
         MeshcatVisualizerParams(role=Role.kPerception, prefix="visual"))

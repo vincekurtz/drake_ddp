@@ -12,8 +12,7 @@ from ilqr import IterativeLinearQuadraticRegulator
 import time
 import utils_derivs_interpolation
 
-meshcat = StartMeshcat()
-MESHCAT_VISUALISATION = True
+meshcat_visualisation = True
 
 ####################################
 # Parameters
@@ -61,7 +60,8 @@ builder.Connect(
         controller.get_output_port(),
         plant.get_actuation_input_port())
 
-if MESHCAT_VISUALISATION:
+if meshcat_visualisation:
+    meshcat = StartMeshcat()
     visualizer = MeshcatVisualizer.AddToBuilder( 
         builder, scene_graph, meshcat,
         MeshcatVisualizerParams(role=Role.kPerception, prefix="visual"))

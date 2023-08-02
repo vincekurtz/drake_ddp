@@ -23,8 +23,7 @@ playback = True    # Visualize the optimal trajectory by playing it back.
 scenario = "side"   # "lift", "forward", or "side"
 save_file = scenario + ".npz"
 
-meshcat = StartMeshcat()
-MESHCAT_VISUALISATION = True
+meshcat_visualisation = True
 
 ####################################
 # Parameters
@@ -213,7 +212,8 @@ plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
 plant, scene_graph = create_system_model(plant, scene_graph)
 
 # Connect to visualizer
-if MESHCAT_VISUALISATION:
+if meshcat_visualisation:
+    meshcat = StartMeshcat()
     visualizer = MeshcatVisualizer.AddToBuilder( 
         builder, scene_graph, meshcat,
         MeshcatVisualizerParams(role=Role.kPerception, prefix="visual"))

@@ -16,16 +16,14 @@ import utils_derivs_interpolation
 # Parameters
 ####################################
 
-T = 10       # total simulation time (S)
+T = 3       # total simulation time (S)
 dt = 0.004      # simulation timestep
-
-meshcat = StartMeshcat()
 
 # Solver method
 # must be "ilqr" or "sqp"
 method = "ilqr"
 MPC = False                         # MPC only works with ilqr for now
-MESHCAT_VISUALISATION = True        # Visualisation with meshcat or drake visualizer
+meshcat_visualisation = True        # Visualisation with meshcat or drake visualizer
 
 # Initial state
 x0 = np.array([0,0,0,0])
@@ -48,9 +46,6 @@ def create_system_model(plant):
     plant.Finalize()
     return plant
 
-meshcat.Delete()
-meshcat.DeleteAddedControls()
-
 ####################################
 # Create system diagram
 ####################################
@@ -64,7 +59,8 @@ builder.Connect(
         controller.get_output_port(),
         plant.get_actuation_input_port())
 
-if(MESHCAT_VISUALISATION):
+if(meshcat_visualisation):
+    meshcat = StartMeshcat()
     visualizer = MeshcatVisualizer.AddToBuilder( 
         builder, scene_graph, meshcat,
         MeshcatVisualizerParams(role=Role.kPerception, prefix="visual"))
@@ -106,9 +102,9 @@ def solve_ilqr(solver, x0, u_guess):
 if method == "ilqr":
     # Set up optimizer
     num_steps = int(T/dt)
-    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 5, 100, 0.0007, 0.0007)
+    interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 5, 100, 0.0007, 0)
     # interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
-    interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 2, 0, 0, 0.00005)
+    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 2, 0, 0, 0.00005)
     ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
             input_port_index=input_port_index,
             beta=0.5, derivs_keypoint_method = interpolation_method)
@@ -213,7 +209,6 @@ def playback(states, timesteps):
     being defined outside of the scope of this function and connected
     to the Drake visualizer.
     """
-    print("begin publishing")
     while True:
         # Just keep playing back the trajectory
         for i in range(len(timesteps)):
