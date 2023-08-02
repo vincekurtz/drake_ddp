@@ -16,8 +16,15 @@ import utils_derivs_interpolation
 # Parameters
 ####################################
 
-T = 3       # total simulation time (S)
+T = 3           # total simulation time (S)
 dt = 0.004      # simulation timestep
+
+# Parameters for derivative interpolation
+keypoint_method = 'adaptiveJerk'        # 'setInterval, or 'adaptiveJerk' or 'iterativeError'
+minN = 5                                # Minimum interval between key-points   
+maxN = 100                              # Maximum interval between key-points
+jerk_threshold = 0.0007                 # Jerk threshold to trigger new key-point (only used in adaptiveJerk)
+iterative_error_threshold = 0.00005     # Error threshold to trigger new key-point (only used in iterativeError)
 
 # Solver method
 # must be "ilqr" or "sqp"
@@ -102,9 +109,7 @@ def solve_ilqr(solver, x0, u_guess):
 if method == "ilqr":
     # Set up optimizer
     num_steps = int(T/dt)
-    interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 5, 100, 0.0007, 0)
-    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
-    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 2, 0, 0, 0.00005)
+    interpolation_method = utils_derivs_interpolation.derivs_interpolation(keypoint_method, minN, maxN, jerk_threshold, iterative_error_threshold)
     ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
             input_port_index=input_port_index,
             beta=0.5, derivs_keypoint_method = interpolation_method)

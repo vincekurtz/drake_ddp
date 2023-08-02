@@ -33,6 +33,13 @@ T = 0.5
 dt = 1e-2
 playback_rate = 0.125
 
+# Parameters for derivative interpolation
+keypoint_method = 'iterativeError'          # 'setInterval, or 'adaptiveJerk' or 'iterativeError'
+minN = 5                                    # Minimum interval between key-points   
+maxN = 40                                   # Maximum interval between key-points
+jerk_threshold = 1e-4                       # Jerk threshold to trigger new key-point (only used in adaptiveJerk)
+iterative_error_threshold = 1e-2            # Error threshold to trigger new key-point (only used in iterativeError)
+
 # Some useful joint angle definitions
 q_home = np.pi/180*np.array([0, 15, 180, 230, 0, 55, 90])
 q_retract = np.array([0, 5.93-2*np.pi, np.pi, 3.734-2*np.pi, 0, 5.408-2*np.pi, np.pi/2])
@@ -242,10 +249,7 @@ if optimize:
 
     # Set up the optimizer
     num_steps = int(T/dt)
-    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 5, 0, 0, 0)
-    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 5, 40, 1e-3, 0)
-    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
-    interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 5, 0, 0, 10)
+    interpolation_method = utils_derivs_interpolation.derivs_interpolation(keypoint_method, minN, maxN, jerk_threshold, iterative_error_threshold)
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
             beta=0.5, delta=1e-3, gamma=0, derivs_keypoint_method = interpolation_method)
 

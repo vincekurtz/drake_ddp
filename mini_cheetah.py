@@ -24,6 +24,13 @@ dt = 4e-3
 playback_rate = 0.2
 target_vel = 1.00   # m/s
 
+# Parameters for derivative interpolation
+keypoint_method = 'iterativeError'      # 'setInterval, or 'adaptiveJerk' or 'iterativeError'
+minN = 2                                # Minimum interval between key-points   
+maxN = 20                               # Maximum interval between key-points
+jerk_threshold = 1e-2                   # Jerk threshold to trigger new key-point (only used in adaptiveJerk)
+iterative_error_threshold = 1e-3        # Error threshold to trigger new key-point (only used in iterativeError)
+
 # MPC parameters
 num_resolves = 100  # total number of times to resolve the optimizaiton problem
 replan_steps = 4    # number of timesteps after which to move the horizon and
@@ -152,10 +159,7 @@ def solve_ilqr(solver, x0, u_guess, move_target=False):
 
 # Set up the optimizer
 num_steps = int(T/dt)
-# interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 5, 0, 0, 0)
-# interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 2, 20, 1e-2, 0)
-# interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
-interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 2, 0, 0, 1e-3)
+interpolation_method = utils_derivs_interpolation.derivs_interpolation(keypoint_method, minN, maxN, jerk_threshold, iterative_error_threshold)
 ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
         beta=0.5, delta=1e-2, gamma=0, derivs_keypoint_method=interpolation_method)
 

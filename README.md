@@ -63,7 +63,7 @@ These are more complex examples that require making and breaking contact. Contac
 ![](images/mini_cheetah.gif)
 
 ## Derivative Interpolation
-To speed up the trajectory optimisation for these models, dynamics gradient interpolation has been added from the paper "adaptive approximation of dynamics gradients via interpolation for speeding up trajectory optimization" by David Russell, Rafael Papallas and Mehmet Dogar, (https://eprints.whiterose.ac.uk/197059/1/ICRA23_0389_FI.pdf).
+To speed up the trajectory optimisation for these models, dynamics gradient interpolation has been added from the paper *adaptive approximation of dynamics gradients via interpolation for speeding up trajectory optimization* by David Russell, Rafael Papallas and Mehmet Dogar, (https://eprints.whiterose.ac.uk/197059/1/ICRA23_0389_FI.pdf).
 
 Computing the dynamics gradients over a trajectroy (fx and fu matrices) is computationally expensive and is the bottleneck for all these tasks, especially as the models dimensionality increases and the dynamics become more complicated.
 
