@@ -7,7 +7,6 @@
 from pydrake.all import *
 import time
 import numpy as np
-import matplotlib.pyplot as plt
 import utils_derivs_interpolation
 
 class IterativeLinearQuadraticRegulator():
@@ -85,7 +84,7 @@ class IterativeLinearQuadraticRegulator():
 
         # -------------------------------- Derivatives interpolation  --------------------------------------
 
-        self.deriv_calculated_at_index = np.zeros(self.N-1, dtype=bool)
+        self.deriv_calculated_at_index = [False] * self.N
         self.time_getDerivs = 0
         self.percentage_derivs = 0
         self.time_backwardsPass = 0

@@ -25,11 +25,11 @@ playback_rate = 0.2
 target_vel = 1.00   # m/s
 
 # Parameters for derivative interpolation
-keypoint_method = 'iterativeError'      # 'setInterval, or 'adaptiveJerk' or 'iterativeError'
+keypoint_method = 'adaptiveJerk'        # 'setInterval, or 'adaptiveJerk' or 'iterativeError'
 minN = 2                                # Minimum interval between key-points   
 maxN = 20                               # Maximum interval between key-points
-jerk_threshold = 1e-2                   # Jerk threshold to trigger new key-point (only used in adaptiveJerk)
-iterative_error_threshold = 1e-3        # Error threshold to trigger new key-point (only used in iterativeError)
+jerk_threshold = 0.3                    # Jerk threshold to trigger new key-point (only used in adaptiveJerk)
+iterative_error_threshold = 10          # Error threshold to trigger new key-point (only used in iterativeError)
 
 # MPC parameters
 num_resolves = 100  # total number of times to resolve the optimizaiton problem
@@ -37,7 +37,7 @@ replan_steps = 4    # number of timesteps after which to move the horizon and
                     # re-solve the MPC problem (>0)
 
 # Some useful definitions
-q0 = np.asarray([ 1.0, 0.0, 0.0, 0.0,     # base orientation
+q0 = np.asarray([ 1.0, 0.0, 0.0, 0.0,      # base orientation
                   0.0, 0.0, 0.29,          # base position
                   0.0,-0.8, 1.6,
                   0.0,-0.8, 1.6,

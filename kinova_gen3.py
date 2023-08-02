@@ -34,11 +34,11 @@ dt = 1e-2
 playback_rate = 0.125
 
 # Parameters for derivative interpolation
-keypoint_method = 'iterativeError'          # 'setInterval, or 'adaptiveJerk' or 'iterativeError'
-minN = 5                                    # Minimum interval between key-points   
+keypoint_method = 'adaptiveJerk'          # 'setInterval, or 'adaptiveJerk' or 'iterativeError'
+minN = 2                                    # Minimum interval between key-points   
 maxN = 40                                   # Maximum interval between key-points
-jerk_threshold = 1e-4                       # Jerk threshold to trigger new key-point (only used in adaptiveJerk)
-iterative_error_threshold = 1e-2            # Error threshold to trigger new key-point (only used in iterativeError)
+jerk_threshold = 1e-2                       # Jerk threshold to trigger new key-point (only used in adaptiveJerk)
+iterative_error_threshold = 10.0            # Error threshold to trigger new key-point (only used in iterativeError)
 
 # Some useful joint angle definitions
 q_home = np.pi/180*np.array([0, 15, 180, 230, 0, 55, 90])
