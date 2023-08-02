@@ -245,7 +245,7 @@ if optimize:
     # interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 5, 0, 0, 0)
     # interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 5, 40, 1e-3, 0)
     # interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
-    interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 5, 0, 0, 1e-10)
+    interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 5, 0, 0, 10)
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
             beta=0.5, delta=1e-3, gamma=0, derivs_keypoint_method = interpolation_method)
 

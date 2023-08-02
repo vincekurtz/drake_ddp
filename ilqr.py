@@ -420,6 +420,7 @@ class IterativeLinearQuadraticRegulator():
             raise Exception('unknown interpolation method')
 
         self.percentage_derivs = (len(keyPoints) / (self.N - 1)) * 100
+        print("keypoints ", keyPoints)
 
         if(DEBUG):
             for t in range(self.N-1):

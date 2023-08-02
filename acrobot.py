@@ -107,8 +107,8 @@ if method == "ilqr":
     # Set up optimizer
     num_steps = int(T/dt)
     # interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 5, 100, 0.0007, 0.0007)
-    interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
-    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 10, 0, 0, 0.00005)
+    # interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
+    interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 2, 0, 0, 0.00005)
     ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
             input_port_index=input_port_index,
             beta=0.5, derivs_keypoint_method = interpolation_method)
