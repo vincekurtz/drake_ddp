@@ -30,7 +30,7 @@ iterative_error_threshold = 0.00005     # Error threshold to trigger new key-poi
 # must be "ilqr" or "sqp"
 method = "ilqr"
 MPC = False                         # MPC only works with ilqr for now
-meshcat_visualisation = True        # Visualisation with meshcat or drake visualizer
+meshcat_visualisation = False        # Visualisation with meshcat or drake visualizer
 
 # Initial state
 x0 = np.array([0,0,0,0])

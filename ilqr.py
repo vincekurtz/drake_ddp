@@ -7,7 +7,6 @@
 from pydrake.all import *
 import time
 import numpy as np
-import matplotlib.pyplot as plt
 import utils_derivs_interpolation
 
 class IterativeLinearQuadraticRegulator():

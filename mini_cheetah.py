@@ -13,7 +13,7 @@ from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
 import utils_derivs_interpolation
 
-meshcat_visualisation = True
+meshcat_visualisation = False
 
 ####################################
 # Parameters

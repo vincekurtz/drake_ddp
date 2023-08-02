@@ -23,7 +23,7 @@ playback = True    # Visualize the optimal trajectory by playing it back.
 scenario = "side"   # "lift", "forward", or "side"
 save_file = scenario + ".npz"
 
-meshcat_visualisation = True
+meshcat_visualisation = False
 
 ####################################
 # Parameters
