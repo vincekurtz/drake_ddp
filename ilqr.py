@@ -83,11 +83,7 @@ class IterativeLinearQuadraticRegulator():
         # reduction in cost dV = sum_t eps*(1-eps/2)*Qu'*Quu^{-1}*Qu
         self.dV_coeff = np.zeros(self.N-1)
 
-        # -------------------------------- Derivatives interpolation additions --------------------------------
-
-        # Arrays for dynamics gradients with interpolation
-        self.fx_baseline = np.zeros((self.n,self.n,self.N-1))
-        self.fu_baseline = np.zeros((self.n,self.m,self.N-1))
+        # -------------------------------- Derivatives interpolation  --------------------------------------
 
         self.deriv_calculated_at_index = np.zeros(self.N-1, dtype=bool)
         self.time_getDerivs = 0
@@ -396,17 +392,6 @@ class IterativeLinearQuadraticRegulator():
             fu:      dynamcis partial wrt control at each timestep
         """
 
-        # Debug variable to plot some useful graphs if required, also calculates the 
-        # derivatives at every time step and compute the error of the interpolation
-        # for debugging
-        DEBUG = False
-
-        if(DEBUG and self.derivs_interpolation.keypoint_method == 'adaptiveJerk'):
-            jerkProfile = self.calc_jerk_profile(x)
-            plt.title("jerk profile")
-            plt.plot(jerkProfile[:,0])
-            plt.show()
-
         # Calculate keypoints over the trajectory
         keyPoints = []
         if(self.derivs_interpolation.keypoint_method == 'setInterval'):
@@ -420,52 +405,23 @@ class IterativeLinearQuadraticRegulator():
             raise Exception('unknown interpolation method')
 
         self.percentage_derivs = (len(keyPoints) / (self.N - 1)) * 100
-        # print("keypoints ", keyPoints)
 
-        if(DEBUG):
-            for t in range(self.N-1):
-                self.fx_baseline[:,:,t], self.fu_baseline[:,:,t] = self._calc_dynamics_partials(x[:,t], u[:,t])
-
-        # Calculate derivatives at keypoints
+        # Calculate derivatives at keypoints (iterative error method will have already done this)
         if self.derivs_interpolation.keypoint_method != 'iterativeError':
             for t in range(len(keyPoints)):
                 self.fx[:,:,keyPoints[t]], self.fu[:,:,keyPoints[t]] = self._calc_dynamics_partials(x[:,keyPoints[t]], u[:,keyPoints[t]])
 
-        # Interpolate derivatives if required
+        # Interpolate derivatives if required (Interpolation not needed in baseline case (setInterval1))
         if not (self.derivs_interpolation.keypoint_method == 'setInterval' and self.derivs_interpolation.minN == 1):
             self.interpolate_derivatives(keyPoints)
-        
-        indexX = 0
-        indexY = 3
-        error_fx, error_fu = self.calc_error_of_interpolation()
-
-        if(DEBUG):  
-            print(f'error fx: {error_fx} error fu:  {error_fu}')
-            plt.title(f"error fx row {indexX} col {indexY}")
-            plt.plot(self.fx[indexX,indexY,:], label="interpolations")
-            plt.plot(self.fx_baseline[indexX,indexY,:], label="baseline")
-            plt.legend()
-            plt.show()    
-
-        # if(DEBUG):
-        #     error_fx, error_fu = self.calc_error_of_interpolation()
-
-        #     print(f'error fx: {error_fx} error fu:  {error_fu}')
-        #     for i in range(self.n):
-        #         for j in range(self.n):
-        #             plt.title(f"error fx row {i} col {j}")
-        #             plt.plot(self.fx[i,j,:], label="interpolations")
-        #             plt.plot(self.fx_baseline[i,j,:], label="baseline")
-        #             plt.legend()
-        #             plt.show()
 
     def get_keypoints_set_interval(self):
         """
         Computes keypoints over the trajectory at set intervals as specified by the
         interpolation method
 
-        Updates:
-            N/A
+        Returns:
+            keypoints:  list of keypoints to compute dynamics gradients at via autodiff
         """
 
         keypoints = []
@@ -481,8 +437,8 @@ class IterativeLinearQuadraticRegulator():
         Computes keypoints over the trajectory adaptively by looking at the jerk
         profile over the trajectory and changing the sample rate based on the jerk
 
-        Updates:
-            N/A
+        Returns:
+            keypoints:  list of keypoints to compute dynamics gradients at via autodiff
         """
         keypoints = []
 
@@ -510,7 +466,6 @@ class IterativeLinearQuadraticRegulator():
         if keypoints[-1] != self.N-2:
             keypoints[-1] = self.N-2
                         
-
         return keypoints
 
     def calc_jerk_profile(self, x):
@@ -518,8 +473,7 @@ class IterativeLinearQuadraticRegulator():
         Calculates the jerk profile (derivative of acceleration) for each
         degree of freedom over the trajectory
 
-        Updates:
-            N/A
+        Returns:    jerk_profile:   jerk profile over the trajectory for each dof
         """
         dof = int(self.n/2)
         jerk = np.zeros((self.N-3, dof))
@@ -530,7 +484,6 @@ class IterativeLinearQuadraticRegulator():
 
                 jerk[t, i] = acell1 - acell2
                 
-
         return jerk
 
     def get_keypoints_iterative_error(self, x, u):
@@ -543,6 +496,8 @@ class IterativeLinearQuadraticRegulator():
         Updates:
             fx:      at certain timesteps
             fu:      at certain timesteps
+        Returns:
+            keypoints:  list of keypoints to compute dynamics gradients at via autodiff
         """
         keypoints = []
         binsComplete = False 
@@ -558,7 +513,6 @@ class IterativeLinearQuadraticRegulator():
             sub_list_indices = []
             all_checks_passed = True
             for i in range(len(list_indices_to_check)):
-                # print(f'checking indices {list_indices_to_check[i].start_index} to {list_indices_to_check[i].end_index}')
 
                 approximation_good = self.check_one_matrix_error(list_indices_to_check[i], x, u)
                 mid_index = int((list_indices_to_check[i].start_index + list_indices_to_check[i].end_index)/2)
@@ -573,7 +527,6 @@ class IterativeLinearQuadraticRegulator():
                     sub_list_with_midpoints.append(mid_index)
                     sub_list_with_midpoints.append(list_indices_to_check[i].end_index)
 
-            
             if(all_checks_passed):
                 binsComplete = True
 
@@ -583,7 +536,6 @@ class IterativeLinearQuadraticRegulator():
         for i in range(self.N-1):
             if(self.deriv_calculated_at_index[i]):
                 keypoints.append(i)
-
 
         return keypoints
 
@@ -597,6 +549,9 @@ class IterativeLinearQuadraticRegulator():
         Updates:
             fx at certain timesteps
             fu at certain timesteps
+
+        Returns:
+            approximation_good:     boolean indicating if the approximation is good
         """
         approximation_good = True
 
@@ -632,11 +587,9 @@ class IterativeLinearQuadraticRegulator():
                 sumSqDiff += (fx_mid_lin[i,j] - self.fx[i,j,mid_index])**2
 
         average_sq_diff = sumSqDiff / (2 * self.n)
-        # print(f'average_sq_diff: {average_sq_diff}')
 
         if(average_sq_diff > self.derivs_interpolation.iterative_error_threshold):
             approximation_good = False
-
 
         return approximation_good
 
@@ -667,28 +620,6 @@ class IterativeLinearQuadraticRegulator():
             for j in range(startIndex, endIndex):
                 self.fx[:,:,j] = startVals_fx + (endVals_fx - startVals_fx) * (j - startIndex) / (endIndex - startIndex)
                 self.fu[:,:,j] = startVals_fu + (endVals_fu - startVals_fu) * (j - startIndex) / (endIndex - startIndex)
-
-    def calc_error_of_interpolation(self):
-        error_fx = 0
-        error_fu = 0
-
-        for t in range(self.N-1):
-            diff_fx = self.diff_between_matrices(self.fx[:,:,t], self.fx_baseline[:,:,t])
-            diff_fu = self.diff_between_matrices(self.fu[:,:,t], self.fu_baseline[:,:,t])
-
-            error_fx += diff_fx
-            error_fu += diff_fu
-
-        return error_fx, error_fu
-
-    def diff_between_matrices(self, matrix1, matrix2):
-        diff = 0
-
-        for i in range(matrix1.shape[0]):
-            for j in range(matrix1.shape[1]):
-                diff += abs(matrix1[i,j] - matrix2[i,j])
-
-        return diff
     
     def _backward_pass(self):
         """
