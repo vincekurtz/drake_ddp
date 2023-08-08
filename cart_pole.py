@@ -22,6 +22,7 @@ T = 2.0        # total simulation time (S)
 dt = 0.01      # simulation timestep
 
 # Parameters for derivative interpolation
+use_derivative_interpolation = False    # Use derivative interpolation
 keypoint_method = 'adaptiveJerk'        # 'setInterval, or 'adaptiveJerk' or 'iterativeError'
 minN = 5                                # Minimum interval between key-points   
 maxN = 10                               # Maximum interval between key-points
@@ -97,7 +98,11 @@ input_port_index = plant_.get_actuation_input_port().get_index()
 if method == "ilqr":
     # Set up the optimizer
     num_steps = int(T/dt)
-    interpolation_method = utils_derivs_interpolation.derivs_interpolation(keypoint_method, minN, maxN, jerk_threshold, iterative_error_threshold)
+
+    if use_derivative_interpolation:
+        interpolation_method = utils_derivs_interpolation.derivs_interpolation(keypoint_method, minN, maxN, jerk_threshold, iterative_error_threshold)
+    else:
+        interpolation_method = None
     ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
             input_port_index=input_port_index,
             beta=0.9, derivs_keypoint_method=interpolation_method)

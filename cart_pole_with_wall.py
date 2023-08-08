@@ -24,15 +24,12 @@ dt = 1e-2
 playback_rate = 0.2
 
 # Parameters for derivative interpolation
+use_derivative_interpolation = False    # Use derivative interpolation
 keypoint_method = 'setInterval'         # 'setInterval, or 'adaptiveJerk' or 'iterativeError'
 minN = 1                                # Minimum interval between key-points   
 maxN = 100                              # Maximum interval between key-points
 jerk_threshold = 0.0007                 # Jerk threshold to trigger new key-point (only used in adaptiveJerk)
 iterative_error_threshold = 0.00005     # Error threshold to trigger new key-point (only used in iterativeError)
-
-# interpolation_method = utils_derivs_interpolation.derivs_interpolation('adaptiveJerk', 1, 20, 0.01, 0)
-# interpolation_method = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
-# interpolation_method = utils_derivs_interpolation.derivs_interpolation('iterativeError', 2, 0, 0, 0.0002)
 
 # Initial state
 x0 = np.array([0,np.pi+0.5,0.0,0])
@@ -143,7 +140,11 @@ system_ = builder_.Build()
 
 # Set up the optimizer
 num_steps = int(T/dt)
-interpolation_method = utils_derivs_interpolation.derivs_interpolation(keypoint_method, minN, maxN, jerk_threshold, iterative_error_threshold)
+
+if use_derivative_interpolation:
+    interpolation_method = utils_derivs_interpolation.derivs_interpolation(keypoint_method, minN, maxN, jerk_threshold, iterative_error_threshold)
+else:
+    interpolation_method = None
 ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, derivs_keypoint_method = interpolation_method)
 
 # Define the optimization problem

@@ -93,7 +93,7 @@ class IterativeLinearQuadraticRegulator():
         # Total number of columns dynamics gradients over the trajectory (trajec length * dof) (we group dof columns into triplets)
         self.total_num_columns_derivs = self.N * self.n
 
-        # If no derivs_interpolation specified - use the baseline case
+        # If no derivs_interpolation specified - use the baseline case (setInterval1 - computing derivatives at every time-step)
         if derivs_keypoint_method is None:
             self.derivs_interpolation = utils_derivs_interpolation.derivs_interpolation('setInterval', 1, 0, 0, 0)
         else:

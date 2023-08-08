@@ -25,6 +25,7 @@ playback_rate = 0.2
 target_vel = 1.00   # m/s
 
 # Parameters for derivative interpolation
+use_derivative_interpolation = False    # Use derivative interpolation
 keypoint_method = 'adaptiveJerk'        # 'setInterval, or 'adaptiveJerk' or 'iterativeError'
 minN = 2                                # Minimum interval between key-points   
 maxN = 20                               # Maximum interval between key-points
@@ -159,7 +160,11 @@ def solve_ilqr(solver, x0, u_guess, move_target=False):
 
 # Set up the optimizer
 num_steps = int(T/dt)
-interpolation_method = utils_derivs_interpolation.derivs_interpolation(keypoint_method, minN, maxN, jerk_threshold, iterative_error_threshold)
+
+if use_derivative_interpolation:
+    interpolation_method = utils_derivs_interpolation.derivs_interpolation(keypoint_method, minN, maxN, jerk_threshold, iterative_error_threshold)
+else:
+    interpolation_method = None
 ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
         beta=0.5, delta=1e-2, gamma=0, derivs_keypoint_method=interpolation_method)
 
