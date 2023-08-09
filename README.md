@@ -62,6 +62,10 @@ These are more complex examples that require making and breaking contact. Contac
 
 ![](images/mini_cheetah.gif)
 
+[`panda_fr3.py`](panda_fr3.py) Perform whole-arm manipulation of a large ball using a Franka Emika Panda FR3 manipulator. 
+
+![](images/panda.gif)
+
 ## Derivative Interpolation
 To speed up the trajectory optimisation for these models, dynamics gradient interpolation has been added from the paper [*adaptive approximation of dynamics gradients via interpolation for speeding up trajectory optimization*](https://eprints.whiterose.ac.uk/197059/1/ICRA23_0389_FI.pdf) by David Russell, Rafael Papallas and Mehmet Dogar.
 
@@ -91,4 +95,3 @@ The iterative error method works very similarly to adaptive-size cell decomposit
 It starts with a bad linear approximation (just using the fist and last time-steps). It then checks the middle of the interpolation, by comparing the difference between the true derivatives (computed via autodiff) and the approximated derivatives (computed via linear interpolartion). The error is computed between these matrices (by calculating the mean squared difference of all values in the matrix). If the error is below the error_threshold then the approximation is good. If the approximation is above the threshold, the algorithm further subdivides that section into smaller sections and repeats this process.
 
 This iterative process is repeated until all segments satisfy the error requirement or the minN interval is reached.
-
