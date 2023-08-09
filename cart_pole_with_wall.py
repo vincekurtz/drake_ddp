@@ -11,6 +11,9 @@ import time
 import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
+import utils_derivs_interpolation
+
+meshcat_visualisation = False
 
 ####################################
 # Parameters
@@ -19,6 +22,14 @@ from ilqr import IterativeLinearQuadraticRegulator
 T = 1.0 
 dt = 1e-2
 playback_rate = 0.2
+
+# Parameters for derivative interpolation
+use_derivative_interpolation = False    # Use derivative interpolation
+keypoint_method = 'setInterval'         # 'setInterval, or 'adaptiveJerk' or 'iterativeError'
+minN = 1                                # Minimum interval between key-points   
+maxN = 100                              # Maximum interval between key-points
+jerk_threshold = 0.0007                 # Jerk threshold to trigger new key-point (only used in adaptiveJerk)
+iterative_error_threshold = 0.00005     # Error threshold to trigger new key-point (only used in iterativeError)
 
 # Initial state
 x0 = np.array([0,np.pi+0.5,0.0,0])
@@ -100,8 +111,14 @@ plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
 plant = create_system_model(plant)
 
 # Connect to visualizer
-DrakeVisualizer().AddToBuilder(builder, scene_graph)
-ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+if meshcat_visualisation:
+    meshcat = StartMeshcat()
+    visualizer = MeshcatVisualizer.AddToBuilder( 
+        builder, scene_graph, meshcat,
+        MeshcatVisualizerParams(role=Role.kPerception, prefix="visual"))
+else:
+    DrakeVisualizer().AddToBuilder(builder, scene_graph)
+    ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
 
 # Finailze the diagram
 diagram = builder.Build()
@@ -123,7 +140,12 @@ system_ = builder_.Build()
 
 # Set up the optimizer
 num_steps = int(T/dt)
-ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5)
+
+if use_derivative_interpolation:
+    interpolation_method = utils_derivs_interpolation.derivs_interpolation(keypoint_method, minN, maxN, jerk_threshold, iterative_error_threshold)
+else:
+    interpolation_method = None
+ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, beta=0.5, derivs_keypoint_method = interpolation_method)
 
 # Define the optimization problem
 ilqr.SetInitialState(x0)

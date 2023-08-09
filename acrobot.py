@@ -10,18 +10,28 @@ import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
 import time
+import utils_derivs_interpolation
 
 ####################################
 # Parameters
 ####################################
 
-T = 1.5        # total simulation time (S)
-dt = 1e-2      # simulation timestep
+T = 3           # total simulation time (S)
+dt = 0.004      # simulation timestep
+
+# Parameters for derivative interpolation
+use_derivative_interpolation = False    # Use derivative interpolation
+keypoint_method = 'adaptiveJerk'        # 'setInterval, or 'adaptiveJerk' or 'iterativeError'
+minN = 5                                # Minimum interval between key-points   
+maxN = 100                              # Maximum interval between key-points
+jerk_threshold = 0.0007                 # Jerk threshold to trigger new key-point (only used in adaptiveJerk)
+iterative_error_threshold = 0.00005     # Error threshold to trigger new key-point (only used in iterativeError)
 
 # Solver method
 # must be "ilqr" or "sqp"
 method = "ilqr"
-MPC = True      # MPC only works with ilqr for now
+MPC = False                         # MPC only works with ilqr for now
+meshcat_visualisation = False        # Visualisation with meshcat or drake visualizer
 
 # Initial state
 x0 = np.array([0,0,0,0])
@@ -57,8 +67,15 @@ builder.Connect(
         controller.get_output_port(),
         plant.get_actuation_input_port())
 
-DrakeVisualizer().AddToBuilder(builder, scene_graph)
-ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+if(meshcat_visualisation):
+    meshcat = StartMeshcat()
+    visualizer = MeshcatVisualizer.AddToBuilder( 
+        builder, scene_graph, meshcat,
+        MeshcatVisualizerParams(role=Role.kPerception, prefix="visual"))
+else:
+    DrakeVisualizer().AddToBuilder(builder, scene_graph)
+    ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+
 
 diagram = builder.Build()
 diagram_context = diagram.CreateDefaultContext()
@@ -93,9 +110,14 @@ def solve_ilqr(solver, x0, u_guess):
 if method == "ilqr":
     # Set up optimizer
     num_steps = int(T/dt)
+    
+    if use_derivative_interpolation:
+        interpolation_method = utils_derivs_interpolation.derivs_interpolation(keypoint_method, minN, maxN, jerk_threshold, iterative_error_threshold)
+    else:
+        interpolation_method = None
     ilqr = IterativeLinearQuadraticRegulator(plant_, num_steps, 
             input_port_index=input_port_index,
-            beta=0.5)
+            beta=0.5, derivs_keypoint_method = interpolation_method)
 
     # Define the problem
     ilqr.SetTargetState(x_nom)

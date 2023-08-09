@@ -11,6 +11,7 @@ import time
 import numpy as np
 from pydrake.all import *
 from ilqr import IterativeLinearQuadraticRegulator
+import utils_derivs_interpolation
 
 # Choose what to do
 simulate = False   # Run a simple simulation with fixed input
@@ -22,6 +23,8 @@ playback = True    # Visualize the optimal trajectory by playing it back.
 scenario = "side"   # "lift", "forward", or "side"
 save_file = scenario + ".npz"
 
+meshcat_visualisation = False
+
 ####################################
 # Parameters
 ####################################
@@ -29,6 +32,14 @@ save_file = scenario + ".npz"
 T = 0.5
 dt = 1e-2
 playback_rate = 0.125
+
+# Parameters for derivative interpolation
+use_derivative_interpolation = False    # Use derivative interpolation
+keypoint_method = 'adaptiveJerk'            # 'setInterval, or 'adaptiveJerk' or 'iterativeError'
+minN = 5                                    # Minimum interval between key-points   
+maxN = 40                                   # Maximum interval between key-points
+jerk_threshold = 1e-4                       # Jerk threshold to trigger new key-point (only used in adaptiveJerk)
+iterative_error_threshold = 1e-2            # Error threshold to trigger new key-point (only used in iterativeError)
 
 # Some useful joint angle definitions
 q_home = np.pi/180*np.array([0, 15, 180, 230, 0, 55, 90])
@@ -209,9 +220,16 @@ plant, scene_graph = AddMultibodyPlantSceneGraph(builder, dt)
 plant, scene_graph = create_system_model(plant, scene_graph)
 
 # Connect to visualizer
-params = DrakeVisualizerParams(role=Role.kProximity, show_hydroelastic=True)
-DrakeVisualizer(params=params).AddToBuilder(builder, scene_graph)
-ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+if meshcat_visualisation:
+    meshcat = StartMeshcat()
+    visualizer = MeshcatVisualizer.AddToBuilder( 
+        builder, scene_graph, meshcat,
+        MeshcatVisualizerParams(role=Role.kPerception, prefix="visual"))
+else:
+    params = DrakeVisualizerParams(role=Role.kProximity, show_hydroelastic=True)
+    DrakeVisualizer(params=params).AddToBuilder(builder, scene_graph)
+    ConnectContactResultsToDrakeVisualizer(builder, plant, scene_graph)
+
 
 # Finailze the diagram
 diagram = builder.Build()
@@ -232,8 +250,13 @@ if optimize:
 
     # Set up the optimizer
     num_steps = int(T/dt)
+    
+    if use_derivative_interpolation:
+        interpolation_method = utils_derivs_interpolation.derivs_interpolation(keypoint_method, minN, maxN, jerk_threshold, iterative_error_threshold)
+    else:
+        interpolation_method = None
     ilqr = IterativeLinearQuadraticRegulator(system_, num_steps, 
-            beta=0.5, delta=1e-3, gamma=0)
+            beta=0.5, delta=1e-3, gamma=0, derivs_keypoint_method = interpolation_method)
 
     # Define the optimization problem
     ilqr.SetInitialState(x0)
