@@ -106,7 +106,7 @@ def create_system_model(plant, scene_graph):
     # Add the kinova arm model from urdf
     # (rigid hydroelastic contact included)
     urdf = "models/kinova_gen3/urdf/GEN3_URDF_V12.urdf"
-    arm = Parser(plant).AddModelFromFile(urdf)
+    arm = Parser(plant).AddModels(urdf)[0]
     X_robot = RigidTransform()
     X_robot.set_translation([0,0,0.015])  # base attachment sets the robot up a bit
     plant.WeldFrames(plant.world_frame(),
@@ -116,7 +116,7 @@ def create_system_model(plant, scene_graph):
     # Add an unactuated gripper from urdf
     # (rigid hydroelastic contact included)
     urdf = "models/2f_85_gripper/urdf/robotiq_2f_85_static.urdf"
-    gripper = Parser(plant).AddModelFromFile(urdf)
+    gripper = Parser(plant).AddModels(urdf)[0]
     X_grip = RigidTransform()
     X_grip.set_rotation(RotationMatrix(RollPitchYaw([0,0,np.pi/2])))
     plant.WeldFrames(plant.GetFrameByName("end_effector_link",arm),

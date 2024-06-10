@@ -33,7 +33,7 @@ jerk_threshold = 0.3                    # Jerk threshold to trigger new key-poin
 iterative_error_threshold = 10          # Error threshold to trigger new key-point (only used in iterativeError)
 
 # MPC parameters
-num_resolves = 100  # total number of times to resolve the optimizaiton problem
+num_resolves = 1  # total number of times to resolve the optimizaiton problem
 replan_steps = 4    # number of timesteps after which to move the horizon and
                     # re-solve the MPC problem (>0)
 
@@ -87,7 +87,7 @@ def create_system_model(plant):
 
     # Add the kinova arm model from urdf (rigid hydroelastic contact included)
     urdf = "models/mini_cheetah/mini_cheetah_mesh.urdf"
-    arm = Parser(plant).AddModelFromFile(urdf)
+    arm = Parser(plant).AddModels(urdf)[0]
 
     # Add a ground with compliant hydroelastic contact
     ground_props = ProximityProperties()

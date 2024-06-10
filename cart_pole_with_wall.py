@@ -58,7 +58,7 @@ mesh_type = HydroelasticContactRepresentation.kPolygon  # Triangle or Polygon
 def create_system_model(plant):
     # Add the cart-pole system
     sdf = FindResourceOrThrow("drake/examples/multibody/cart_pole/cart_pole.sdf")
-    robot = Parser(plant=plant).AddModelFromFile(sdf)
+    robot = Parser(plant=plant).AddModels(sdf)[0]
     
     # Add a ball with compliant hydroelastic contact to the end of the cart-pole system
     radius = 0.05

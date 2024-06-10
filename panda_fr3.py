@@ -95,7 +95,7 @@ def create_system_model(plant, scene_graph):
     # Add the panda arm model from urdf
     # (rigid hydroelastic contact included)
     urdf = "models/panda_fr3/urdf/panda_fr3.urdf"
-    arm = Parser(plant).AddModelFromFile(urdf)
+    arm = Parser(plant).AddModels(urdf)[0]
     X_robot = RigidTransform()
     # base attachment sets the robot up a bit
     X_robot.set_translation([0, 0, 0.015])

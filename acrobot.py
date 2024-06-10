@@ -50,7 +50,7 @@ Qf = 100*np.diag([1,1,1,1])
 
 def create_system_model(plant):
     urdf = FindResourceOrThrow("drake/examples/acrobot/Acrobot.urdf")
-    robot = Parser(plant=plant).AddModelFromFile(urdf)
+    robot = Parser(plant=plant).AddModels(urdf)[0]
     plant.Finalize()
     return plant
 

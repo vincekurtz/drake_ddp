@@ -51,7 +51,7 @@ Qf = np.diag([100,100,10,10])
 
 def create_system_model(plant):
     sdf = FindResourceOrThrow("drake/examples/multibody/cart_pole/cart_pole.sdf")
-    robot = Parser(plant=plant).AddModelFromFile(sdf)
+    robot = Parser(plant=plant).AddModels(sdf)[0]
     plant.Finalize()
     return plant
 
